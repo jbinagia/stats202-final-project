@@ -17,6 +17,11 @@ When you click the **Knit** button a document will be generated that includes bo
 
 $$ y = x^2 $$ 
 
+```{r sai}
+cars_df=as.data.frame(cars)
+print("here")
+```
+
 ```{r cars}
 summary(cars)
 ```
