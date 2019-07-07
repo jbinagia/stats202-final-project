@@ -11,27 +11,55 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-$$ y = x^2 $$ 
-
-```{r sai}
-cars_df=as.data.frame(cars)
-print("here")
+```{r Load Libraries}
+library(dplyr)
+library(ggplot2)
+library(hexbin)
+library(RColorBrewer)
+library(ggrepel)
+library(extrafont)
+library(ggfortify)
 ```
 
-```{r cars}
-summary(cars)
+The first thing to explore is looking at the effect of the drug treatment on the total PANSS score over time.
+
+```{r Load Data}
+
+A_df=read.csv("Data/Study_A.csv")
+B_df=read.csv("Data/Study_B.csv")
+C_df=read.csv("Data/Study_C.csv")
+D_df=read.csv("Data/Study_D.csv")
+E_df=read.csv("Data/Study_E.csv")
+
+summary(A_df)
+```
+
+
+```{r PANSS_Total vs Visit}
+#Take just treated patients and control patients in A
+#Plot PANSS_Total vs Visit Day, for patients and control
+
+A_df_treated=A_df[which(A_df$TxGroup == "Treatment"),]
+A_df_control=A_df[which(A_df$TxGroup == "Control"),]
+
+p=ggplot(NULL,aes(x=VisitDay))+
+  geom_point(data=A_df_treated,aes(y=PANSS_Total,col="Treatment"),size=0.5)+
+  geom_point(data=A_df_control,aes(y=PANSS_Total,col="Control"),size=0.5)+
+  scale_color_manual(values=rev(pal_aaas("default")(2)))+
+  theme_minimal()+
+  theme(legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
+#ggsave(plotname,p,width=6,height=6,units="in",dpi="retina")
+
 ```
 
 ## Including Plots
 
 You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r Plot, echo=FALSE}
+
+p
+
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
