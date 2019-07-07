@@ -9,22 +9,74 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Notes/Assumptions
+- As stated here <https://datascience.stackexchange.com/questions/22/k-means-clustering-for-mixed-numeric-and-categorical-data?answertab=votes#tab-top>, k-means clustering can not be immediately used with categorical data. For this reason, we will focus on the quantitative data for the purpose of segmentation.
+- We also do not want to categorize based on IDs since these are arbitrarily assigned and are not measuring some intrinsic property; thus, we exclude these columns as well.
+- Segmentation is only based on variables measured on the initial day. 
+- Finally, including `PANSS_Total` is redundant so our relavent columns are just the 30 assessments. 
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+## Setup
+```{r Load Libraries, results='hide'}
+#library(dplyr)
+library(ggplot2)
+library(hexbin)
+library(RColorBrewer)
+library(ggrepel)
+library(ggfortify)
+library(extrafont)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r Load Data}
+A_df=read.csv("Data/Study_A.csv")
+B_df=read.csv("Data/Study_B.csv")
+C_df=read.csv("Data/Study_C.csv")
+D_df=read.csv("Data/Study_D.csv")
+E_df=read.csv("Data/Study_E.csv")
+summary(A_df)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Clean and organize the data before unsupervised learning
+
+### Only examine the first day
+```{r first day}
+A_df = subset(A_df, VisitDay==0)
+B_df = subset(B_df, VisitDay==0)
+C_df = subset(C_df, VisitDay==0)
+D_df = subset(D_df, VisitDay==0)
+E_df = subset(E_df, VisitDay==0)
+```
+
+```{r remove columns}
+A_sub = A_df[ , -which(names(A_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+B_sub = B_df[ , -which(names(B_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+C_sub = C_df[ , -which(names(C_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+D_sub = D_df[ , -which(names(D_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+E_sub = E_df[ , -which(names(E_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+names(A_sub)
+```
+
+### Merge dataframes
+```{r merge}
+combined_df = rbind(A_sub,B_sub,C_sub,D_sub,E_sub)
+```
+
+### Scale
+```{r scale}
+A_scale = scale(A_sub)
+B_scale = scale(B_sub)
+C_scale = scale(C_sub)
+D_scale = scale(D_sub)
+E_scale = scale(E_sub)
+scaled_df = scale(combined_df)
+summary(scaled_df)
+```
+
+## K-means clustering
+```{r k-means}
+set.seed(2)
+km.out = kmeans(scaled_df, 8, nstart =50)
+km.clusters =km.out$cluster
+km.out$tot.withinss # total within-cluster sum of squares
+km.out$withinss # within-cluster sum of squares
+```

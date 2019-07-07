@@ -6,6 +6,9 @@ final tweaks and writeup until 8/14 (due date)
 
 ## To-do
 - part 1
-  - how to better define eficacy? 
+  - how to better define eficacy?
 - part 2
-  - k-means clustering (JB)
+  - k-means clustering
+    - Why is the objective function so large? How *large* is large? Is this acceptable?
+    - How to visualize k-means when there are 30 predictors? 
+    - To-do: plot total error as a function of k to find out at which point there is no longer a gain in increasing the model flexibility. Choose minimum k possible.
