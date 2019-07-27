@@ -27,6 +27,7 @@ library(RColorBrewer)
 library(ggrepel)
 library(ggfortify)
 library(extrafont)
+library(factoextra)
 ```
 
 ```{r Load Data}
@@ -74,11 +75,51 @@ scaled_df = scale(combined_df)
 summary(scaled_df)
 ```
 
+## determine optimal number of clusters
+```{r optimal-k}
+# Elbow method
+fviz_nbclust(scaled_df, kmeans, method = "wss") +
+    geom_vline(xintercept = 4, linetype = 2)+
+  labs(subtitle = "Elbow method")
+
+# Silhouette method
+fviz_nbclust(scaled_df, kmeans, method = "silhouette")+
+  labs(subtitle = "Silhouette method")
+
+# Gap statistic
+# nboot = 50 to keep the function speedy. 
+# recommended value: nboot= 500 for your analysis.
+# Use verbose = FALSE to hide computing progression.
+
+#set.seed(1)
+#fviz_nbclust(scaled_df, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
+#  labs(subtitle = "Gap statistic method")
+```
+
 ## K-means clustering
 ```{r k-means}
-set.seed(2)
-km.out = kmeans(scaled_df, 8, nstart =50)
+set.seed(1)
+km.out = kmeans(scaled_df, 2, nstart =50)
 km.clusters =km.out$cluster
 km.out$tot.withinss # total within-cluster sum of squares
 km.out$withinss # within-cluster sum of squares
+```
+
+## k-means information
+```{r k-means-info}
+km.out$size # cluster size
+#km.out$centers # cluster means
+```
+
+## visualize results
+```{r k-means-visual}
+fviz_cluster(km.out, scaled_df,geom = c("point"))
+```
+
+## pam clustering
+```{r pam}
+#require(cluster) 
+pam.res <- pam(scaled_df, 2)
+ # Visualize pam clustering
+fviz_cluster(pam.res, geom = "point", ellipse.type = "norm")
 ```
