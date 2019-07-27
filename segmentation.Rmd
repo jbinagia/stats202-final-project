@@ -14,8 +14,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Notes/Assumptions
 - As stated [here](https://datascience.stackexchange.com/questions/22/k-means-clustering-for-mixed-numeric-and-categorical-data?answertab=votes#tab-top), k-means clustering can not be immediately used with categorical data. For this reason, we will focus on the quantitative data for the purpose of segmentation.
 - We also do not want to categorize based on IDs since these are arbitrarily assigned and are not measuring some intrinsic property; thus, we exclude these columns as well.
-- Segmentation is only based on variables measured on the initial day. 
-- Finally, including `PANSS_Total` is redundant so our relavent columns are just the 30 assessments. 
+- Segmentation is only based on variables measured on the initial day.
+- Finally, including `PANSS_Total` is redundant so our relavent columns are just the 30 assessments.
 
 
 ## Setup
@@ -87,7 +87,7 @@ fviz_nbclust(scaled_df, kmeans, method = "silhouette")+
   labs(subtitle = "Silhouette method")
 
 # Gap statistic
-# nboot = 50 to keep the function speedy. 
+# nboot = 50 to keep the function speedy.
 # recommended value: nboot= 500 for your analysis.
 # Use verbose = FALSE to hide computing progression.
 
@@ -103,7 +103,6 @@ km.out = kmeans(scaled_df, 2, nstart =50)
 km.clusters =km.out$cluster
 km.out$tot.withinss # total within-cluster sum of squares
 km.out$withinss # within-cluster sum of squares
-```
 
 ## k-means information
 ```{r k-means-info}
@@ -118,8 +117,42 @@ fviz_cluster(km.out, scaled_df,geom = c("point"))
 
 ## pam clustering
 ```{r pam}
-#require(cluster) 
+#require(cluster)
 pam.res <- pam(scaled_df, 2)
  # Visualize pam clustering
 fviz_cluster(pam.res, geom = "point", ellipse.type = "norm")
+```
+
+## Hierarchical Clustering
+```{r remove columns}
+#keep country this time
+A_sub = A_df[ , -which(names(A_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+B_sub = B_df[ , -which(names(B_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+C_sub = C_df[ , -which(names(C_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+D_sub = D_df[ , -which(names(D_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+E_sub = E_df[ , -which(names(E_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+names(A_sub)
+```
+
+### Merge dataframes
+```{r merge}
+combined_df = rbind(A_sub,B_sub,C_sub,D_sub,E_sub)
+```
+
+### Scale
+```{r scale}
+combined.data=combined_df[,2:31]
+combined.labs=combined_df[,1]
+scaled_data = scale(combined.data)
+summary(scaled_data)
+summary(combined.labs)
+```
+
+
+```{r hclust}
+library("factoextra")
+hc.complete=hclust (dist(combined.data),method="complete")
+par(mfrow =c(1,1))
+plot(hc.complete,labels=combined.labs,main="Complete Linkage",xlab="",sub="",ylab="")
+fviz_dend(hc.complete,labels=combined.labs)
 ```
