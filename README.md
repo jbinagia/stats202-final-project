@@ -1,12 +1,13 @@
 # stats202-final-project
-- part 1&2:  7/10
+- part 1&2:  7/12
 - part 3: 7/27
 - part 4: 8/3
 - final tweaks and writeup until 8/14 (due date)
 
 ## To-do
 - part 1
-  - how to better define eficacy?
+  - how to better define efficacy?
+  - Still working on this (7/10 - extend to 7/12)
 - part 2
   - k-means clustering
     - Why is the objective function so large? How *large* is large? Is this acceptable?
