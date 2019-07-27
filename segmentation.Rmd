@@ -116,11 +116,34 @@ km.out$tot.withinss # total within-cluster sum of squares
 km.out$withinss # within-cluster sum of squares
 km.out$size # cluster size
 #km.out$centers # cluster means
+
+combined_df$Country=combined.labs
+combined_df$Cluster=km.out$cluster
+head(combined_df)
 ```
 
 ## visualize results
 ```{r k-means-visual}
-fviz_cluster(km.out, scaled_df,geom = c("point"))
+fviz_cluster(km.out, scaled_df,geom = c("point"),labels=combined.labs)
+```
+
+##histogram of countries in each cluster
+```{r histogram}
+
+clust1_df=combined_df[which(combined_df$Cluster==1),]
+clust2_df=combined_df[which(combined_df$Cluster==2),]
+clust3_df=combined_df[which(combined_df$Cluster==3),]
+clust4_df=combined_df[which(combined_df$Cluster==4),]
+
+par(mfrow=c(2,2))
+
+hist.c1=barplot(prop.table(table(as.factor(clust1_df$Country))),las=2)
+hist.c2=barplot(prop.table(table(as.factor(clust2_df$Country))),las=2)
+hist.c3=barplot(prop.table(table(as.factor(clust3_df$Country))),las=2)
+hist.c4=barplot(prop.table(table(as.factor(clust4_df$Country))),las=2)
+
+
+
 ```
 
 ## pam clustering
@@ -140,23 +163,23 @@ summary(cvalid.out)
 ## Hierarchical Clustering
 ```{r remove columns}
 #keep country this time
-A_sub = A_df[ , -which(names(A_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-B_sub = B_df[ , -which(names(B_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-C_sub = C_df[ , -which(names(C_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-D_sub = D_df[ , -which(names(D_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-E_sub = E_df[ , -which(names(E_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+A_sub_hc = A_df[ , -which(names(A_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+B_sub_hc = B_df[ , -which(names(B_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+C_sub_hc = C_df[ , -which(names(C_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+D_sub_hc = D_df[ , -which(names(D_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+E_sub_hc = E_df[ , -which(names(E_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 names(A_sub)
 ```
 
 ### Merge dataframes
 ```{r merge}
-combined_df = rbind(A_sub,B_sub,C_sub,D_sub,E_sub)
+combined_df_hc = rbind(A_sub_hc,B_sub_hc,C_sub_hc,D_sub_hc,E_sub_hc)
 ```
 
 ### Scale
 ```{r scale}
-combined.data=combined_df[,2:31]
-combined.labs=combined_df[,1]
+combined.data=combined_df_hc[,2:31]
+combined.labs=combined_df_hc[,1]
 scaled_data = scale(combined.data)
 summary(scaled_data)
 summary(combined.labs)
