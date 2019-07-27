@@ -2,7 +2,9 @@
 title: "Patient Segmentation"
 author: "Jeremy Binagia and Sai Gourisankar"
 date: "7/5/2019"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -10,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Notes/Assumptions
-- As stated here <https://datascience.stackexchange.com/questions/22/k-means-clustering-for-mixed-numeric-and-categorical-data?answertab=votes#tab-top>, k-means clustering can not be immediately used with categorical data. For this reason, we will focus on the quantitative data for the purpose of segmentation.
+- As stated [here](https://datascience.stackexchange.com/questions/22/k-means-clustering-for-mixed-numeric-and-categorical-data?answertab=votes#tab-top), k-means clustering can not be immediately used with categorical data. For this reason, we will focus on the quantitative data for the purpose of segmentation.
 - We also do not want to categorize based on IDs since these are arbitrarily assigned and are not measuring some intrinsic property; thus, we exclude these columns as well.
 - Segmentation is only based on variables measured on the initial day. 
 - Finally, including `PANSS_Total` is redundant so our relavent columns are just the 30 assessments. 
