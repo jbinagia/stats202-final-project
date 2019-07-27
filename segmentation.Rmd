@@ -82,3 +82,40 @@ km.clusters =km.out$cluster
 km.out$tot.withinss # total within-cluster sum of squares
 km.out$withinss # within-cluster sum of squares
 ```
+
+## Hierarchical Clustering
+```{r remove columns}
+#keep country this time
+A_sub = A_df[ , -which(names(A_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+B_sub = B_df[ , -which(names(B_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+C_sub = C_df[ , -which(names(C_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+D_sub = D_df[ , -which(names(D_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+E_sub = E_df[ , -which(names(E_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+names(A_sub)
+```
+
+### Merge dataframes
+```{r merge}
+combined_df = rbind(A_sub,B_sub,C_sub,D_sub,E_sub)
+```
+
+### Scale
+```{r scale}
+combined.data=combined_df[,2:31]
+combined.labs=combined_df[,1]
+scaled_data = scale(combined.data)
+summary(scaled_data)
+summary(combined.labs)
+```
+
+
+```{r hclust}
+library("factoextra")
+hc.complete=hclust (dist(combined.data),method="complete")
+par(mfrow =c(1,1))
+plot(hc.complete,labels=combined.labs,main="Complete Linkage",xlab="",sub="",ylab="")
+fviz_dend(hc.complete,labels=combined.labs)
+```
+
+
+
