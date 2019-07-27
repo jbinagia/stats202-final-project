@@ -12,5 +12,6 @@
     - Why is the objective function so large? How *large* is large? Is this acceptable?
     - How to visualize k-means when there are 30 predictors?
       - <https://www.datanovia.com/en/lessons/k-means-clustering-in-r-algorith-and-practical-examples/#visualizing-k-means-clusters>
-      - I.e. we should do PCA before k-means 
+      - I.e. we should do PCA before k-means
     - To-do: plot total error as a function of k to find out at which point there is no longer a gain in increasing the model flexibility. Choose minimum k possible.
+      - Along these same lines, can you cross-validation (ISL Ch. 5.1) to choose the optimal value of k. 5-fold or 10-fold cross-validation. 
