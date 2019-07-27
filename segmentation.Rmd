@@ -31,6 +31,7 @@ library(factoextra)
 library(NbClust)
 library(cluster)
 library(clValid)
+library(ggfortify)
 ```
 
 ```{r Load Data}
@@ -116,35 +117,14 @@ km.out$tot.withinss # total within-cluster sum of squares
 km.out$withinss # within-cluster sum of squares
 km.out$size # cluster size
 #km.out$centers # cluster means
-
-combined_df$Country=combined.labs
-combined_df$Cluster=km.out$cluster
-head(combined_df)
 ```
 
 ## visualize results
 ```{r k-means-visual}
-fviz_cluster(km.out, scaled_df,geom = c("point"),labels=combined.labs)
+#fviz_cluster(km.out, scaled_df,geom = c("point"),labels=combined.labs)
+fviz_cluster(km.out, scaled_df,geom = c("point"))
 ```
 
-##histogram of countries in each cluster
-```{r histogram}
-
-clust1_df=combined_df[which(combined_df$Cluster==1),]
-clust2_df=combined_df[which(combined_df$Cluster==2),]
-clust3_df=combined_df[which(combined_df$Cluster==3),]
-clust4_df=combined_df[which(combined_df$Cluster==4),]
-
-par(mfrow=c(2,2))
-
-hist.c1=barplot(prop.table(table(as.factor(clust1_df$Country))),las=2)
-hist.c2=barplot(prop.table(table(as.factor(clust2_df$Country))),las=2)
-hist.c3=barplot(prop.table(table(as.factor(clust3_df$Country))),las=2)
-hist.c4=barplot(prop.table(table(as.factor(clust4_df$Country))),las=2)
-
-
-
-```
 
 ## pam clustering
 ```{r pam}
@@ -160,7 +140,38 @@ summary(cvalid.out)
 ```
 
 
-## Hierarchical Clustering
+## pca for data interpretation
+```{r pca}
+pca.out = prcomp(scaled_df, scale=TRUE)
+ggplot2::autoplot(pca.out, label = FALSE, loadings.label = TRUE)
+```
+
+```{r pca-function}
+pcaCharts <- function(x) {
+    x.var <- x$sdev ^ 2
+    x.pvar <- x.var/sum(x.var)
+    print("proportions of variance:")
+    print(x.pvar)
+    
+    par(mfrow=c(2,2))
+    plot(x.pvar,xlab="Principal component", ylab="Proportion of variance explained", ylim=c(0,1), type='b')
+    plot(cumsum(x.pvar),xlab="Principal component", ylab="Cumulative Proportion of variance explained", ylim=c(0,1), type='b')
+    screeplot(x)
+    screeplot(x,type="l")
+    par(mfrow=c(1,1))
+}
+
+# check proportion of variance explained by each component 
+pcaCharts(pca.out)
+```
+From this analysis, it would be reasonable to focus on the first three principal components in terms of describing the clusters. 
+
+```{r pca-loadings}
+pca.out$rotation[,1:3]
+```
+
+
+## Hierarchical clustering
 ```{r remove columns}
 #keep country this time
 A_sub_hc = A_df[ , -which(names(A_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
@@ -171,7 +182,7 @@ E_sub_hc = E_df[ , -which(names(E_df) %in% c("Study","PatientID","SiteID","Rater
 names(A_sub)
 ```
 
-### Merge dataframes
+### Merge dataframes for hierarchical clustering
 ```{r merge}
 combined_df_hc = rbind(A_sub_hc,B_sub_hc,C_sub_hc,D_sub_hc,E_sub_hc)
 ```
@@ -183,6 +194,26 @@ combined.labs=combined_df_hc[,1]
 scaled_data = scale(combined.data)
 summary(scaled_data)
 summary(combined.labs)
+```
+
+## Histogram of countries in each cluster
+```{r histogram}
+combined_df$Country=combined.labs
+combined_df$Cluster=km.out$cluster
+head(combined_df)
+
+clust1_df=combined_df[which(combined_df$Cluster==1),]
+clust2_df=combined_df[which(combined_df$Cluster==2),]
+clust3_df=combined_df[which(combined_df$Cluster==3),]
+clust4_df=combined_df[which(combined_df$Cluster==4),]
+
+par(mfrow=c(2,2))
+
+hist.c1=barplot(prop.table(table(as.factor(clust1_df$Country))),las=2)
+hist.c2=barplot(prop.table(table(as.factor(clust2_df$Country))),las=2)
+hist.c3=barplot(prop.table(table(as.factor(clust3_df$Country))),las=2)
+hist.c4=barplot(prop.table(table(as.factor(clust4_df$Country))),las=2)
+
 ```
 
 ```{r hclust}
