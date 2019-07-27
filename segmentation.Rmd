@@ -123,6 +123,7 @@ pam.res <- pam(scaled_df, 2)
 fviz_cluster(pam.res, geom = "point", ellipse.type = "norm")
 ```
 
+
 ## Hierarchical Clustering
 ```{r remove columns}
 #keep country this time
@@ -147,7 +148,6 @@ scaled_data = scale(combined.data)
 summary(scaled_data)
 summary(combined.labs)
 ```
-
 
 ```{r hclust}
 library("factoextra")
