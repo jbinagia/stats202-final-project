@@ -22,7 +22,7 @@ knitr::opts_chunk$set(echo = TRUE)
 - `clValid` reported k-means with k = 2 as the algorithm of choice 3 times out 7 for the various performance measures. PAM (k-medoids) was selected once with k = 2. The next largest value of k chosen in this way was 6. To reduce model complexity, let's select k = 2. 
 - This is corroborated by the fact that k-means with k = 2 produced the maximal average silhouette width. Silhouette also suggests that k =2 is optimal for PAMS as well. 
 - Note that from the average silhouette width plots, there is little to be gained from going past k = 5 and 6 for k-means and pams respectively. 
-- Furthermore, gap statistic has a clear elbow at k = 2 for k-means. And when considering 30 different indices for clustering performance, 10 proposed 2 as the best number of clusters while only 4 proposed 3 as the best number of clusters (for k-means). 
+- Furthermore, gap statistic has a clear elbow at k = 2 for k-means and PAM. And when considering 30 different indices for clustering performance, 10 proposed 2 as the best number of clusters while only 4 proposed 3 as the best number of clusters (for k-means). 
 - Visually this seems like an acceptable result. Both PAM (k-medoids) and k-means are neatly separated along the first principal component in this way into clusters of roughly the same size. The boundary falls right at the zero-point for the first principal component. 
 - This principal component is mostly explained by P2, G15, P1, P6, G9, and G11 respectively in that order. I.e. the patients are mainly separated by how they scored on positive symptoms and general psychology symptoms. 
 - Indeed, the first five contributors for the second principal components are all scores related to negative symptoms (recall there are 7 total negative symptom scores). 
@@ -127,7 +127,8 @@ fviz_nbclust(scaled_df, kmeans, method = "silhouette")+
 # Use verbose = FALSE to hide computing progression.
 
 set.seed(1)
-fviz_nbclust(scaled_df, kmeans,k.max = 6,iter.max=30,nstart = 25,method="gap_stat",nboot = 100)+
+gc() 
+fviz_nbclust(scaled_df, kmeans,k.max = 10,iter.max=30,nstart = 25,method="gap_stat",nboot = 500)+
   labs(subtitle = "Gap statistic method")
 ```
 
@@ -172,7 +173,7 @@ fviz_nbclust(scaled_df, pam, method = "silhouette")+
 # Use verbose = FALSE to hide computing progression.
 
 set.seed(1)
-fviz_nbclust(scaled_df, k.max = 6, pam,method="gap_stat",nboot = 100)+
+fviz_nbclust(scaled_df, k.max = 10, pam,method="gap_stat",nboot = 50)+
   labs(subtitle = "Gap statistic method")
 ```
 
