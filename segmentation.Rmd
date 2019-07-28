@@ -18,6 +18,13 @@ knitr::opts_chunk$set(echo = TRUE)
 - Finally, including `PANSS_Total` is redundant so our relavent columns are just the 30 assessments.
 - We do not use cross-validation for determing parameters like $k$ in $k$-means clustering because to do so we need some sort of "ground truth" (e.g. see [here](https://stats.stackexchange.com/questions/200254/cross-validation-for-k-means-clustering-in-r/246749) or [here](https://stackoverflow.com/questions/6629165/k-fold-cross-validation-for-determining-k-in-k-means)). Better to pick the number of clusters via cluster stability, etc. 
 
+# Thoughts/Conclusions
+- `clValid` reported k-means with k = 2 as the algorithm of choice 3 times out 7 for the various performance measures. PAM (k-medoids) was selected once with k = 2. The next largest value of k chosen in this way was 6. To reduce model complexity, let's select k = 2. 
+- This is corroborated by the fact that k-means with k = 2 produced the maximal silhouette statistic. Silhouette also suggests that k =2 is optimal for PAMS as well. 
+- Visually this seems like an acceptable result. Both PAM (k-medoids) and k-means are neatly separated along the first principal component in this way into clusters of roughly the same size. 
+- This principal component is mostly explained by P2, G15, P1, P6, G9, and G11 respectively in that order. I.e. the patients are mainly separated by how they scored on positive symptoms and general psychology symptoms. 
+- Indeed, the first five contributors for the second principal components are all scores related to negative symptoms (recall there are 7 total negative symptom scores). 
+
 
 # Further reading
 - [More ideas for feature extraction](https://towardsdatascience.com/10-tips-for-choosing-the-optimal-number-of-clusters-277e93d72d92)
@@ -63,15 +70,15 @@ E_df = subset(E_df, VisitDay==0)
 
 ```{r remove columns}
 A_sub = A_df[ , -which(names(A_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
-                                            "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 B_sub = B_df[ , -which(names(B_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
-                                            "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 C_sub = C_df[ , -which(names(C_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
-                                            "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 D_sub = D_df[ , -which(names(D_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
-                                            "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 E_sub = E_df[ , -which(names(E_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
-                                            "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 names(A_sub)
 ```
 
@@ -105,7 +112,7 @@ summary(scaled_df)
 ```{r optimal-k}
 # Elbow method
 fviz_nbclust(scaled_df, kmeans, method = "wss",print.summary=TRUE) +
-    geom_vline(xintercept = 4, linetype = 2)+
+    geom_vline(xintercept = 2, linetype = 2)+
   labs(subtitle = "Elbow method")
 
 # Silhouette method
@@ -145,6 +152,29 @@ fviz_cluster(km.out, scaled_df,geom = c("point"))
 ```
 
 # Pam clustering
+
+## determine optimal number of clusters for pam 
+```{r optimal-k-pam}
+# Elbow method
+fviz_nbclust(scaled_df, pam, method = "wss",print.summary=TRUE) +
+    geom_vline(xintercept = 2, linetype = 2)+
+  labs(subtitle = "Elbow method")
+
+# Silhouette method
+fviz_nbclust(scaled_df, pam, method = "silhouette")+
+  labs(subtitle = "Silhouette method")
+
+# Gap statistic
+# nboot = 50 to keep the function speedy. Number of Monte Carlo ("bootstrap") samples.
+# recommended value: nboot= 500 for your analysis.
+# Use verbose = FALSE to hide computing progression.
+
+#set.seed(1)
+#fviz_nbclust(scaled_df, pam,iter.max=30,nstart = 25,method="gap_stat",nboot = 50)+
+#  labs(subtitle = "Gap statistic method")
+```
+
+## Pam algorithm
 ```{r pam}
 pam.res <- pam(scaled_df, chosen_k)
  # Visualize pam clustering
@@ -246,21 +276,23 @@ summary(combined.labs)
 
 ### Histogram of countries in each cluster
 ```{r histogram}
-combined_df$Country=combined.labs
-combined_df$Cluster=km.out$cluster
-head(combined_df)
+# commented out since was receiving error
 
-clust1_df=combined_df[which(combined_df$Cluster==1),]
-clust2_df=combined_df[which(combined_df$Cluster==2),]
-clust3_df=combined_df[which(combined_df$Cluster==3),]
-clust4_df=combined_df[which(combined_df$Cluster==4),]
+#combined_df$Country=combined.labs
+#combined_df$Cluster=km.out$cluster
+#head(combined_df)
 
-par(mfrow=c(2,2))
+#clust1_df=combined_df[which(combined_df$Cluster==1),]
+#clust2_df=combined_df[which(combined_df$Cluster==2),]
+#clust3_df=combined_df[which(combined_df$Cluster==3),]
+#clust4_df=combined_df[which(combined_df$Cluster==4),]
 
-hist.c1=barplot(prop.table(table(as.factor(clust1_df$Country))),las=2)
-hist.c2=barplot(prop.table(table(as.factor(clust2_df$Country))),las=2)
-hist.c3=barplot(prop.table(table(as.factor(clust3_df$Country))),las=2)
-hist.c4=barplot(prop.table(table(as.factor(clust4_df$Country))),las=2)
+#par(mfrow=c(2,2))
+
+#hist.c1=barplot(prop.table(table(as.factor(clust1_df$Country))),las=2)
+#hist.c2=barplot(prop.table(table(as.factor(clust2_df$Country))),las=2)
+#hist.c3=barplot(prop.table(table(as.factor(clust3_df$Country))),las=2)
+#hist.c4=barplot(prop.table(table(as.factor(clust4_df$Country))),las=2)
 
 ```
 
