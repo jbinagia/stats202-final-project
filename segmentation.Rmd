@@ -16,6 +16,12 @@ knitr::opts_chunk$set(echo = TRUE)
 - We also do not want to categorize based on IDs since these are arbitrarily assigned and are not measuring some intrinsic property; thus, we exclude these columns as well.
 - Segmentation is only based on variables measured on the initial day.
 - Finally, including `PANSS_Total` is redundant so our relavent columns are just the 30 assessments.
+- We do not use cross-validation for determing parameters like $k$ in $k$-means clustering because to do so we need some sort of "ground truth" (e.g. see [here](https://stats.stackexchange.com/questions/200254/cross-validation-for-k-means-clustering-in-r/246749) or [here](https://stackoverflow.com/questions/6629165/k-fold-cross-validation-for-determining-k-in-k-means)). Better to pick the number of clusters via cluster stability, etc. 
+
+
+## Further reading
+- [Extracting features?](https://towardsdatascience.com/10-tips-for-choosing-the-optimal-number-of-clusters-277e93d72d92)
+- [Factoextra](http://www.sthda.com/english/wiki/factoextra-r-package-easy-multivariate-data-analyses-and-elegant-visualization?fbclid=IwAR2EzCxaHHeUjofDVhauwiAOXT9YIKB-njM58tTxru1D-MAYgIbxwpeaMqI#principal-component-analysis) is quite an amazing R package. 
 
 
 ## Setup
@@ -28,6 +34,7 @@ library(ggrepel)
 library(ggfortify)
 library(extrafont)
 library(factoextra)
+library("FactoMineR")
 library(NbClust)
 library(cluster)
 library(clValid)
@@ -122,7 +129,7 @@ km.out$size # cluster size
 ## visualize results
 ```{r k-means-visual}
 #fviz_cluster(km.out, scaled_df,geom = c("point"),labels=combined.labs)
-fviz_cluster(km.out, scaled_df,geom = c("point"))
+fviz_cluster(km.out, maxitems = 3000, scaled_df,geom = c("point"))
 ```
 
 
@@ -135,7 +142,7 @@ fviz_cluster(pam.res, geom = "point")
 
 ## choosing best algorithm
 ```{r choosing}
-cvalid.out = clValid(scaled_df, nClust = 2:6, clMethods = c("kmeans","pam"), validation = "internal")
+cvalid.out = clValid(scaled_df, maxitems = 3000, nClust = 2:6, clMethods = c("kmeans","pam"), validation = "internal")
 summary(cvalid.out)
 ```
 
@@ -170,9 +177,37 @@ From this analysis, it would be reasonable to focus on the first three principal
 pca.out$rotation[,1:3]
 ```
 
+## cleaner pca analysis
+```{r pca-v2}
+res.pca = PCA(scaled_df, graph = FALSE)
+print(res.pca)
+```
+### Visualize eigenvalues/variances
+```{r percent-explained}
+fviz_screeplot(res.pca, addlabels = TRUE, ylim = c(0, 50))
+```
+
+### Relationship to predictors
+```{r relationship-to-pred}
+# Graph of variables: default plot
+fviz_pca_var(res.pca, col.var="contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE # Avoid text overlapping
+             )
+
+# Contributions of variables to PC1
+fviz_contrib(res.pca, choice = "var", axes = 1, top = 10)
+
+# Contributions of variables to PC2
+fviz_contrib(res.pca, choice = "var", axes = 2, top = 10)
+
+# Contributions of variables to PC2
+fviz_contrib(res.pca, choice = "var", axes = 3, top = 10)
+```
+
 
 ## Hierarchical clustering
-```{r remove columns}
+```{r remove-columns-hc}
 #keep country this time
 A_sub_hc = A_df[ , -which(names(A_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 B_sub_hc = B_df[ , -which(names(B_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
@@ -183,12 +218,12 @@ names(A_sub)
 ```
 
 ### Merge dataframes for hierarchical clustering
-```{r merge}
+```{r merge-hc}
 combined_df_hc = rbind(A_sub_hc,B_sub_hc,C_sub_hc,D_sub_hc,E_sub_hc)
 ```
 
 ### Scale
-```{r scale}
+```{r scale-hc}
 combined.data=combined_df_hc[,2:31]
 combined.labs=combined_df_hc[,1]
 scaled_data = scale(combined.data)
@@ -196,7 +231,7 @@ summary(scaled_data)
 summary(combined.labs)
 ```
 
-## Histogram of countries in each cluster
+### Histogram of countries in each cluster
 ```{r histogram}
 combined_df$Country=combined.labs
 combined_df$Cluster=km.out$cluster
