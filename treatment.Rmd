@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Treatment Effect
 
 ```{r Load Libraries}
 library(dplyr)
@@ -19,6 +19,9 @@ library(RColorBrewer)
 library(ggrepel)
 library(extrafont)
 library(ggfortify)
+library(ggsci)
+library(forecast)
+library(zoo)
 ```
 
 The first thing to explore is looking at the effect of the drug treatment on the total PANSS score over time.
@@ -32,34 +35,105 @@ D_df=read.csv("Data/Study_D.csv")
 E_df=read.csv("Data/Study_E.csv")
 
 summary(A_df)
+
 ```
 
+```{r combine datasets}
+#remove LeadStatus column
+A_sub = A_df[ , -which(names(A_df) %in% c("LeadStatus"))]
+B_sub = B_df[ , -which(names(B_df) %in% c("LeadStatus"))]
+C_sub = C_df[ , -which(names(C_df) %in% c("LeadStatus"))]
+D_sub = D_df[ , -which(names(D_df) %in% c("LeadStatus"))]
+E_sub = E_df[ , -which(names(E_df) %in% c("LeadStatus"))]
+
+combined_df = rbind(A_sub,B_sub,C_sub,D_sub,E_sub)
+```
 
 ```{r PANSS_Total vs Visit}
-#Take just treated patients and control patients in A
+
 #Plot PANSS_Total vs Visit Day, for patients and control
 
-A_df_treated=A_df[which(A_df$TxGroup == "Treatment"),]
-A_df_control=A_df[which(A_df$TxGroup == "Control"),]
+combined_df_treated=combined_df[which(combined_df$TxGroup == "Treatment"),]
+combined_df_control=combined_df[which(combined_df$TxGroup == "Control"),]
 
-p=ggplot(NULL,aes(x=VisitDay))+
-  geom_point(data=A_df_treated,aes(y=PANSS_Total,col="Treatment"),size=0.5)+
-  geom_point(data=A_df_control,aes(y=PANSS_Total,col="Control"),size=0.5)+
+
+moving_average_day=30
+combined_df_treated$roll=rollmean(combined_df_treated$PANSS_Total,moving_average_day,na.pad=TRUE)
+combined_df_control$roll=rollmean(combined_df_control$PANSS_Total,moving_average_day,na.pad=TRUE)
+
+p=ggplot(NULL,aes())+
+  geom_point(data=combined_df_treated,aes(x=VisitDay,y=PANSS_Total,col="Treatment"),size=0.5)+
+  geom_point(data=combined_df_control,aes(x=VisitDay,y=PANSS_Total,col="Control"),size=0.5)+
   scale_color_manual(values=rev(pal_aaas("default")(2)))+
+  #geom_line(data=combined_df_treated,aes(x=VisitDay,y=roll,col="Treatment"))+
+  #geom_line(data=combined_df_control,aes(x=VisitDay,y=roll,col="Control"))+
   theme_minimal()+
   theme(legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
 #ggsave(plotname,p,width=6,height=6,units="in",dpi="retina")
 
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
 
 ```{r Plot, echo=FALSE}
 
-p
+print(p)
 
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+A plot of the total PANSS score over time does not immediately reveal a treatment effect. But to quantify this we can do a linear regression on the total PANSS score vs time, where we regress PANSS_Total onto VisitDay, and a dummy variable for Control or Treatment interacting with VisitDay: $y=\beta_0 + \beta_1*VisitDay + \beta_2*VisitDay*Treatment$
+```{r linear regression}
+attach(combined_df)
+lm.fit=lm(PANSS_Total~VisitDay+VisitDay:TxGroup)
+contrasts(TxGroup)
+
+```
+The dummy encoding is 1 for treatment, 0 for Control.
+```{r examine linear regression}
+summary(lm.fit)
+```
+
+From the linear regression, we cannot rule out the hypothesis that the treatment group (Control or Treated) had no effect on the total PANSS score over time. 
+
+But maybe what we need to do is look at each patient individually - given they may have started at different total PANSS (so different severities of the disease), we need to look at their individual differences in total PANSS over time, in treatment and control groups. 
+```{r create delta PANSS}
+
+combined_df_zero=combined_df[which(combined_df$VisitDay==0),]
+combined_df$deltaPANSS=combined_df$PANSS_Total
+#combined_df[which(combined_df$PatientID==10001),]
+for (id in combined_df_zero$PatientID){
+  zeroValue=combined_df_zero[which(combined_df_zero$PatientID==id),]$PANSS_Total
+  combined_df[which(combined_df$PatientID==id),]$deltaPANSS=combined_df[which(combined_df$PatientID==id),]$PANSS_Total-zeroValue
+}
+head(combined_df)
+```
+```{r plot delta PANSS}
+#Plot PANSS_Total vs Visit Day, for patients and control
+
+combined_df_treated=combined_df[which(combined_df$TxGroup == "Treatment"),]
+combined_df_control=combined_df[which(combined_df$TxGroup == "Control"),]
+
+
+moving_average_day=30
+combined_df_treated$roll=rollmean(combined_df_treated$deltaPANSS,moving_average_day,na.pad=TRUE)
+combined_df_control$roll=rollmean(combined_df_control$deltaPANSS,moving_average_day,na.pad=TRUE)
+
+p=ggplot(NULL,aes())+
+  geom_point(data=combined_df_treated,aes(x=VisitDay,y=deltaPANSS,col="Treatment"),size=0.5)+
+  geom_point(data=combined_df_control,aes(x=VisitDay,y=deltaPANSS,col="Control"),size=0.5)+
+  scale_color_manual(values=rev(pal_aaas("default")(2)))+
+  #geom_line(data=combined_df_treated,aes(x=VisitDay,y=roll,col="Treatment"))+
+  #geom_line(data=combined_df_control,aes(x=VisitDay,y=roll,col="Control"))+
+  theme_minimal()+
+  theme(legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
+print(p)
+```
+All this did was rescale the data. But we can re-do the linear regression and see if there is an effect of treatment on total PANSS score difference for each patient:
+```{r delta linear regression}
+attach(combined_df)
+lm.fit=lm(deltaPANSS~VisitDay+VisitDay:TxGroup)
+summary(lm.fit)
+```
+We still cannot rule out that there is no effect of treatment on the patient group's change in total PANSS score. 
+
+
