@@ -11,7 +11,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Notes/Assumptions
+# Notes/Assumptions
 - As stated [here](https://datascience.stackexchange.com/questions/22/k-means-clustering-for-mixed-numeric-and-categorical-data?answertab=votes#tab-top), k-means clustering can not be immediately used with categorical data. For this reason, we will focus on the quantitative data for the purpose of segmentation.
 - We also do not want to categorize based on IDs since these are arbitrarily assigned and are not measuring some intrinsic property; thus, we exclude these columns as well.
 - Segmentation is only based on variables measured on the initial day.
@@ -19,14 +19,13 @@ knitr::opts_chunk$set(echo = TRUE)
 - We do not use cross-validation for determing parameters like $k$ in $k$-means clustering because to do so we need some sort of "ground truth" (e.g. see [here](https://stats.stackexchange.com/questions/200254/cross-validation-for-k-means-clustering-in-r/246749) or [here](https://stackoverflow.com/questions/6629165/k-fold-cross-validation-for-determining-k-in-k-means)). Better to pick the number of clusters via cluster stability, etc. 
 
 
-## Further reading
-- [Extracting features?](https://towardsdatascience.com/10-tips-for-choosing-the-optimal-number-of-clusters-277e93d72d92)
+# Further reading
+- [More ideas for feature extraction](https://towardsdatascience.com/10-tips-for-choosing-the-optimal-number-of-clusters-277e93d72d92)
 - [Factoextra](http://www.sthda.com/english/wiki/factoextra-r-package-easy-multivariate-data-analyses-and-elegant-visualization?fbclid=IwAR2EzCxaHHeUjofDVhauwiAOXT9YIKB-njM58tTxru1D-MAYgIbxwpeaMqI#principal-component-analysis) is quite an amazing R package. 
 
 
-## Setup
-```{r Load Libraries, results='hide'}
-#library(dplyr)
+# Setup
+```{r Load Libraries, results="hide"}
 library(ggplot2)
 library(hexbin)
 library(RColorBrewer)
@@ -62,11 +61,16 @@ E_df = subset(E_df, VisitDay==0)
 ```
 
 ```{r remove columns}
-A_sub = A_df[ , -which(names(A_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-B_sub = B_df[ , -which(names(B_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-C_sub = C_df[ , -which(names(C_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-D_sub = D_df[ , -which(names(D_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-E_sub = E_df[ , -which(names(E_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+A_sub = A_df[ , -which(names(A_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
+                                            "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+B_sub = B_df[ , -which(names(B_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
+                                            "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+C_sub = C_df[ , -which(names(C_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
+                                            "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+D_sub = D_df[ , -which(names(D_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
+                                            "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+E_sub = E_df[ , -which(names(E_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
+                                            "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 names(A_sub)
 ```
 
@@ -86,6 +90,14 @@ scaled_df = scale(combined_df)
 summary(scaled_df)
 ```
 
+# Deciding on a clustering algorithm 
+```{r choosing}
+cvalid.out = clValid(scaled_df, maxitems = 3000, nClust = 2:8, 
+                     clMethods = c("kmeans","pam"), validation = c("internal", "stability"))
+summary(cvalid.out)
+```
+
+# K-means clustering 
 ## determine optimal number of clusters
 ```{r optimal-k}
 # Elbow method
@@ -102,17 +114,17 @@ fviz_nbclust(scaled_df, kmeans, method = "silhouette")+
 # recommended value: nboot= 500 for your analysis.
 # Use verbose = FALSE to hide computing progression.
 
-set.seed(1)
-fviz_nbclust(scaled_df, kmeans, k.max = 10, iter.max=30, nstart = 25,  method = "gap_stat", nboot = 50)+
-  labs(subtitle = "Gap statistic method")
+#set.seed(1)
+#fviz_nbclust(scaled_df, kmeans,k.max = 10,iter.max=30,nstart = 25,method="gap_stat",nboot = 50)+
+#  labs(subtitle = "Gap statistic method")
 ```
 
-## 30 indices
+## 30 indices for determing value of k 
 ```{r 30-indices}
-NbClust(data = scaled_df, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans");
+#NbClust(data = scaled_df, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans");
 ```
 
-## K-means clustering
+## K-means clustering for chosen value of k 
 ```{r k-means}
 set.seed(1)
 chosen_k = 4
@@ -129,25 +141,20 @@ km.out$size # cluster size
 ## visualize results
 ```{r k-means-visual}
 #fviz_cluster(km.out, scaled_df,geom = c("point"),labels=combined.labs)
-fviz_cluster(km.out, maxitems = 3000, scaled_df,geom = c("point"))
+fviz_cluster(km.out, scaled_df,geom = c("point"))
 ```
 
 
-## pam clustering
+# Pam clustering
 ```{r pam}
-pam.res <- pam(scaled_df, chosen_k)
+pam.res <- pam(scaled_df, 2)
  # Visualize pam clustering
 fviz_cluster(pam.res, geom = "point")
 ```
 
-## choosing best algorithm
-```{r choosing}
-cvalid.out = clValid(scaled_df, maxitems = 3000, nClust = 2:6, clMethods = c("kmeans","pam"), validation = "internal")
-summary(cvalid.out)
-```
 
 
-## pca for data interpretation
+# PCA for data interpretation
 ```{r pca}
 pca.out = prcomp(scaled_df, scale=TRUE)
 ggplot2::autoplot(pca.out, label = FALSE, loadings.label = TRUE)
@@ -161,8 +168,10 @@ pcaCharts <- function(x) {
     print(x.pvar)
     
     par(mfrow=c(2,2))
-    plot(x.pvar,xlab="Principal component", ylab="Proportion of variance explained", ylim=c(0,1), type='b')
-    plot(cumsum(x.pvar),xlab="Principal component", ylab="Cumulative Proportion of variance explained", ylim=c(0,1), type='b')
+    plot(x.pvar,xlab="Principal component", 
+         ylab="Proportion of variance explained", ylim=c(0,1), type='b')
+    plot(cumsum(x.pvar),xlab="Principal component", 
+         ylab="Cumulative Proportion of variance explained", ylim=c(0,1), type='b')
     screeplot(x)
     screeplot(x,type="l")
     par(mfrow=c(1,1))
@@ -209,11 +218,16 @@ fviz_contrib(res.pca, choice = "var", axes = 3, top = 10)
 ## Hierarchical clustering
 ```{r remove-columns-hc}
 #keep country this time
-A_sub_hc = A_df[ , -which(names(A_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-B_sub_hc = B_df[ , -which(names(B_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-C_sub_hc = C_df[ , -which(names(C_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-D_sub_hc = D_df[ , -which(names(D_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-E_sub_hc = E_df[ , -which(names(E_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+A_sub_hc=A_df[,-which(names(A_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD",
+                                             "TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+B_sub_hc=B_df[,-which(names(B_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD",
+                                             "TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+C_sub_hc=C_df[,-which(names(C_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD",
+                                             "TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+D_sub_hc=D_df[,-which(names(D_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD",
+                                             "TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+E_sub_hc=E_df[,-which(names(E_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD",
+                                             "TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 names(A_sub)
 ```
 
@@ -252,18 +266,17 @@ hist.c4=barplot(prop.table(table(as.factor(clust4_df$Country))),las=2)
 ```
 
 ```{r hclust}
-library("factoextra")
-hc.complete=hclust (dist(combined.data),method="complete")
-par(mfrow =c(1,1))
-plot(hc.complete,labels=combined.labs,main="Complete Linkage",xlab="",sub="",ylab="")
-fviz_dend(hc.complete,labels=combined.labs)
+#hc.complete=hclust (dist(combined.data),method="complete")
+#par(mfrow =c(1,1))
+#plot(hc.complete,labels=combined.labs,main="Complete Linkage",xlab="",sub="",ylab="")
+#fviz_dend(hc.complete,labels=combined.labs)
 ```
 
 ### Factoextra hierarchical clustering
 ```{r fa-hierarchical}
 # Compute hierarchical clustering and cut into 4 clusters
-res <- hcut(scaled_df, k = 4, stand = TRUE)
+#res <- hcut(scaled_df, k = 4, stand = TRUE)
 # Visualize
-fviz_dend(res, rect = TRUE, cex = 0.5,
-          k_colors = c("#00AFBB","#2E9FDF", "#E7B800", "#FC4E07"))
+#fviz_dend(res, rect = TRUE, cex = 0.5,
+#          k_colors = c("#00AFBB","#2E9FDF", "#E7B800", "#FC4E07"))
 ```
