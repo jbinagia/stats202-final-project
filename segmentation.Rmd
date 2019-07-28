@@ -11,16 +11,31 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Notes/Assumptions
+# Notes/Assumptions
 - As stated [here](https://datascience.stackexchange.com/questions/22/k-means-clustering-for-mixed-numeric-and-categorical-data?answertab=votes#tab-top), k-means clustering can not be immediately used with categorical data. For this reason, we will focus on the quantitative data for the purpose of segmentation.
 - We also do not want to categorize based on IDs since these are arbitrarily assigned and are not measuring some intrinsic property; thus, we exclude these columns as well.
 - Segmentation is only based on variables measured on the initial day.
 - Finally, including `PANSS_Total` is redundant so our relavent columns are just the 30 assessments.
+- We do not use cross-validation for determing parameters like $k$ in $k$-means clustering because to do so we need some sort of "ground truth" (e.g. see [here](https://stats.stackexchange.com/questions/200254/cross-validation-for-k-means-clustering-in-r/246749) or [here](https://stackoverflow.com/questions/6629165/k-fold-cross-validation-for-determining-k-in-k-means)). Better to pick the number of clusters via cluster stability, etc. 
+
+# Thoughts/Conclusions
+- `clValid` reported k-means with k = 2 as the algorithm of choice 3 times out 7 for the various performance measures. PAM (k-medoids) was selected once with k = 2. The next largest value of k chosen in this way was 6. To reduce model complexity, let's select k = 2. 
+- This is corroborated by the fact that k-means with k = 2 produced the maximal average silhouette width. Silhouette also suggests that k =2 is optimal for PAMS as well. 
+- Note that from the average silhouette width plots, there is little to be gained from going past k = 5 and 6 for k-means and pams respectively. 
+- Furthermore, gap statistic has a clear elbow at k = 2 for k-means. And when considering 30 different indices for clustering performance, 10 proposed 2 as the best number of clusters while only 4 proposed 3 as the best number of clusters (for k-means). 
+- Visually this seems like an acceptable result. Both PAM (k-medoids) and k-means are neatly separated along the first principal component in this way into clusters of roughly the same size. The boundary falls right at the zero-point for the first principal component. 
+- This principal component is mostly explained by P2, G15, P1, P6, G9, and G11 respectively in that order. I.e. the patients are mainly separated by how they scored on positive symptoms and general psychology symptoms. 
+- Indeed, the first five contributors for the second principal components are all scores related to negative symptoms (recall there are 7 total negative symptom scores). 
 
 
-## Setup
-```{r Load Libraries, results='hide'}
-#library(dplyr)
+# Further reading
+- [More ideas for feature extraction](https://towardsdatascience.com/10-tips-for-choosing-the-optimal-number-of-clusters-277e93d72d92)
+- [Factoextra](http://www.sthda.com/english/wiki/factoextra-r-package-easy-multivariate-data-analyses-and-elegant-visualization?fbclid=IwAR2EzCxaHHeUjofDVhauwiAOXT9YIKB-njM58tTxru1D-MAYgIbxwpeaMqI#principal-component-analysis) is quite an amazing R package. 
+- Notes on [cluster validation statistics](https://www.datanovia.com/en/lessons/cluster-validation-statistics-must-know-methods/)
+
+
+# Setup
+```{r Load Libraries, results="hide"}
 library(ggplot2)
 library(hexbin)
 library(RColorBrewer)
@@ -28,6 +43,11 @@ library(ggrepel)
 library(ggfortify)
 library(extrafont)
 library(factoextra)
+library("FactoMineR")
+library(NbClust)
+library(cluster)
+library(clValid)
+library(ggfortify)
 ```
 
 ```{r Load Data}
@@ -51,11 +71,16 @@ E_df = subset(E_df, VisitDay==0)
 ```
 
 ```{r remove columns}
-A_sub = A_df[ , -which(names(A_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-B_sub = B_df[ , -which(names(B_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-C_sub = C_df[ , -which(names(C_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-D_sub = D_df[ , -which(names(D_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-E_sub = E_df[ , -which(names(E_df) %in% c("Study","Country","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+A_sub = A_df[ , -which(names(A_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+B_sub = B_df[ , -which(names(B_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+C_sub = C_df[ , -which(names(C_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+D_sub = D_df[ , -which(names(D_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+E_sub = E_df[ , -which(names(E_df) %in% c("Study","Country","PatientID","SiteID","RaterID",
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 names(A_sub)
 ```
 
@@ -75,11 +100,21 @@ scaled_df = scale(combined_df)
 summary(scaled_df)
 ```
 
+# Deciding on a clustering algorithm 
+```{r choosing}
+#cvalid.out = clValid(scaled_df, maxitems = 3000, nClust = 2:8, 
+#                     clMethods = c("kmeans","pam"), validation = c("internal", "stability"))
+#summary(cvalid.out)
+```
+
+![clValid results](clustering-results.png)
+
+# K-means clustering 
 ## determine optimal number of clusters
 ```{r optimal-k}
 # Elbow method
-fviz_nbclust(scaled_df, kmeans, method = "wss") +
-    geom_vline(xintercept = 4, linetype = 2)+
+fviz_nbclust(scaled_df, kmeans, method = "wss",print.summary=TRUE) +
+    geom_vline(xintercept = 2, linetype = 2)+
   labs(subtitle = "Elbow method")
 
 # Silhouette method
@@ -87,83 +122,155 @@ fviz_nbclust(scaled_df, kmeans, method = "silhouette")+
   labs(subtitle = "Silhouette method")
 
 # Gap statistic
-# nboot = 50 to keep the function speedy.
+# nboot = 50 to keep the function speedy. Number of Monte Carlo ("bootstrap") samples.
 # recommended value: nboot= 500 for your analysis.
 # Use verbose = FALSE to hide computing progression.
 
-#set.seed(1)
-#fviz_nbclust(scaled_df, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
-#  labs(subtitle = "Gap statistic method")
+set.seed(1)
+fviz_nbclust(scaled_df, kmeans,k.max = 6,iter.max=30,nstart = 25,method="gap_stat",nboot = 100)+
+  labs(subtitle = "Gap statistic method")
 ```
 
-## K-means clustering
+## 30 indices for determing value of k 
+```{r 30-indices}
+NbClust(data = scaled_df, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans");
+```
+
+## K-means clustering for chosen value of k 
 ```{r k-means}
 set.seed(1)
-km.out = kmeans(scaled_df, 4, nstart =50)
+chosen_k = 2
+
+km.out = kmeans(scaled_df, chosen_k, nstart = 50)
 km.clusters =km.out$cluster
+
+# stats
 km.out$tot.withinss # total within-cluster sum of squares
 km.out$withinss # within-cluster sum of squares
-```
-## k-means information
-```{r k-means-info}
 km.out$size # cluster size
-#km.out$centers # cluster means
-combined_df$Country=combined.labs
-combined_df$Cluster=km.out$cluster
-head(combined_df)
+
+# visualize
+fviz_cluster(km.out, scaled_df,geom = c("point"))
 ```
 
-## visualize results
-```{r k-means-visual}
-fviz_cluster(km.out, scaled_df,geom = c("point"),labels=combined.labs)
+# Pam clustering
+
+## determine optimal number of clusters for pam 
+```{r optimal-k-pam}
+# Elbow method
+fviz_nbclust(scaled_df, pam, method = "wss",print.summary=TRUE) +
+    geom_vline(xintercept = 2, linetype = 2)+
+  labs(subtitle = "Elbow method")
+
+# Silhouette method
+fviz_nbclust(scaled_df, pam, method = "silhouette")+
+  labs(subtitle = "Silhouette method")
+
+# Gap statistic
+# nboot = 50 to keep the function speedy. Number of Monte Carlo ("bootstrap") samples.
+# recommended value: nboot= 500 for your analysis.
+# Use verbose = FALSE to hide computing progression.
+
+set.seed(1)
+fviz_nbclust(scaled_df, k.max = 6, pam,method="gap_stat",nboot = 100)+
+  labs(subtitle = "Gap statistic method")
 ```
 
-##histogram of countries in each cluster
-```{r histogram}
-
-clust1_df=combined_df[which(combined_df$Cluster==1),]
-clust2_df=combined_df[which(combined_df$Cluster==2),]
-clust3_df=combined_df[which(combined_df$Cluster==3),]
-clust4_df=combined_df[which(combined_df$Cluster==4),]
-
-par(mfrow=c(2,2))
-
-hist.c1=barplot(prop.table(table(as.factor(clust1_df$Country))),las=2)
-hist.c2=barplot(prop.table(table(as.factor(clust2_df$Country))),las=2)
-hist.c3=barplot(prop.table(table(as.factor(clust3_df$Country))),las=2)
-hist.c4=barplot(prop.table(table(as.factor(clust4_df$Country))),las=2)
 
 
-
-```
-
-## pam clustering
+## Pam algorithm
 ```{r pam}
-#require(cluster)
-pam.res <- pam(scaled_df, 2)
+pam.res <- pam(scaled_df, chosen_k)
  # Visualize pam clustering
-fviz_cluster(pam.res, geom = "point", ellipse.type = "norm")
+fviz_cluster(pam.res, geom = "point")
 ```
 
 
-## Hierarchical Clustering
-```{r remove columns}
+
+# PCA for data interpretation
+```{r pca}
+pca.out = prcomp(scaled_df, scale=TRUE)
+ggplot2::autoplot(pca.out, label = FALSE, loadings.label = TRUE)
+```
+
+```{r pca-function}
+pcaCharts <- function(x) {
+    x.var <- x$sdev ^ 2
+    x.pvar <- x.var/sum(x.var)
+    print("proportions of variance:")
+    print(x.pvar)
+    
+    par(mfrow=c(2,2))
+    plot(x.pvar,xlab="Principal component", 
+         ylab="Proportion of variance explained", ylim=c(0,1), type='b')
+    plot(cumsum(x.pvar),xlab="Principal component", 
+         ylab="Cumulative Proportion of variance explained", ylim=c(0,1), type='b')
+    screeplot(x)
+    screeplot(x,type="l")
+    par(mfrow=c(1,1))
+}
+
+# check proportion of variance explained by each component 
+pcaCharts(pca.out)
+```
+From this analysis, it would be reasonable to focus on the first three principal components in terms of describing the clusters. 
+
+```{r pca-loadings}
+pca.out$rotation[,1:3]
+```
+
+## cleaner pca analysis
+```{r pca-v2}
+res.pca = PCA(scaled_df, graph = FALSE)
+print(res.pca)
+```
+### Visualize eigenvalues/variances
+```{r percent-explained}
+fviz_screeplot(res.pca, addlabels = TRUE, ylim = c(0, 50))
+```
+
+### Relationship to predictors
+```{r relationship-to-pred}
+# Graph of variables: default plot
+fviz_pca_var(res.pca, col.var="contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE # Avoid text overlapping
+             )
+
+# Contributions of variables to PC1
+fviz_contrib(res.pca, choice = "var", axes = 1, top = 10)
+
+# Contributions of variables to PC2
+fviz_contrib(res.pca, choice = "var", axes = 2, top = 10)
+
+# Contributions of variables to PC2
+fviz_contrib(res.pca, choice = "var", axes = 3, top = 10)
+```
+
+
+## Hierarchical clustering
+```{r remove-columns-hc}
 #keep country this time
-A_sub_hc = A_df[ , -which(names(A_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-B_sub_hc = B_df[ , -which(names(B_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-C_sub_hc = C_df[ , -which(names(C_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-D_sub_hc = D_df[ , -which(names(D_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
-E_sub_hc = E_df[ , -which(names(E_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+A_sub_hc=A_df[,-which(names(A_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD",
+                                             "TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+B_sub_hc=B_df[,-which(names(B_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD",
+                                             "TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+C_sub_hc=C_df[,-which(names(C_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD",
+                                             "TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+D_sub_hc=D_df[,-which(names(D_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD",
+                                             "TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
+E_sub_hc=E_df[,-which(names(E_df) %in% c("Study","PatientID","SiteID","RaterID","AssessmentiD",
+                                             "TxGroup","VisitDay","PANSS_Total","LeadStatus"))]
 names(A_sub)
 ```
 
-### Merge dataframes
-```{r merge}
+### Merge dataframes for hierarchical clustering
+```{r merge-hc}
 combined_df_hc = rbind(A_sub_hc,B_sub_hc,C_sub_hc,D_sub_hc,E_sub_hc)
 ```
 
 ### Scale
-```{r scale}
+```{r scale-hc}
 combined.data=combined_df_hc[,2:31]
 combined.labs=combined_df_hc[,1]
 scaled_data = scale(combined.data)
@@ -171,10 +278,40 @@ summary(scaled_data)
 summary(combined.labs)
 ```
 
+### Histogram of countries in each cluster
+```{r histogram}
+# commented out since was receiving error
+
+#combined_df$Country=combined.labs
+#combined_df$Cluster=km.out$cluster
+#head(combined_df)
+
+#clust1_df=combined_df[which(combined_df$Cluster==1),]
+#clust2_df=combined_df[which(combined_df$Cluster==2),]
+#clust3_df=combined_df[which(combined_df$Cluster==3),]
+#clust4_df=combined_df[which(combined_df$Cluster==4),]
+
+#par(mfrow=c(2,2))
+
+#hist.c1=barplot(prop.table(table(as.factor(clust1_df$Country))),las=2)
+#hist.c2=barplot(prop.table(table(as.factor(clust2_df$Country))),las=2)
+#hist.c3=barplot(prop.table(table(as.factor(clust3_df$Country))),las=2)
+#hist.c4=barplot(prop.table(table(as.factor(clust4_df$Country))),las=2)
+
+```
+
 ```{r hclust}
-library("factoextra")
-hc.complete=hclust (dist(combined.data),method="complete")
-par(mfrow =c(1,1))
-plot(hc.complete,labels=combined.labs,main="Complete Linkage",xlab="",sub="",ylab="")
-fviz_dend(hc.complete,labels=combined.labs)
+#hc.complete=hclust (dist(combined.data),method="complete")
+#par(mfrow =c(1,1))
+#plot(hc.complete,labels=combined.labs,main="Complete Linkage",xlab="",sub="",ylab="")
+#fviz_dend(hc.complete,labels=combined.labs)
+```
+
+### Factoextra hierarchical clustering
+```{r fa-hierarchical}
+# Compute hierarchical clustering and cut into 4 clusters
+#res <- hcut(scaled_df, k = 4, stand = TRUE)
+# Visualize
+#fviz_dend(res, rect = TRUE, cex = 0.5,
+#          k_colors = c("#00AFBB","#2E9FDF", "#E7B800", "#FC4E07"))
 ```
