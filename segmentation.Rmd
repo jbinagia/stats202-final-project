@@ -93,10 +93,12 @@ summary(scaled_df)
 
 # Deciding on a clustering algorithm 
 ```{r choosing}
-cvalid.out = clValid(scaled_df, maxitems = 3000, nClust = 2:8, 
-                     clMethods = c("kmeans","pam"), validation = c("internal", "stability"))
-summary(cvalid.out)
+#cvalid.out = clValid(scaled_df, maxitems = 3000, nClust = 2:8, 
+#                     clMethods = c("kmeans","pam"), validation = c("internal", "stability"))
+#summary(cvalid.out)
 ```
+
+![clValid results](clustering-results.png)
 
 # K-means clustering 
 ## determine optimal number of clusters
@@ -128,27 +130,23 @@ fviz_nbclust(scaled_df, kmeans, method = "silhouette")+
 ## K-means clustering for chosen value of k 
 ```{r k-means}
 set.seed(1)
-chosen_k = 4
+chosen_k = 2
 
 km.out = kmeans(scaled_df, chosen_k, nstart =50)
 km.clusters =km.out$cluster
 
+# stats
 km.out$tot.withinss # total within-cluster sum of squares
 km.out$withinss # within-cluster sum of squares
 km.out$size # cluster size
-#km.out$centers # cluster means
-```
 
-## visualize results
-```{r k-means-visual}
-#fviz_cluster(km.out, scaled_df,geom = c("point"),labels=combined.labs)
+# visualize
 fviz_cluster(km.out, scaled_df,geom = c("point"))
 ```
 
-
 # Pam clustering
 ```{r pam}
-pam.res <- pam(scaled_df, 2)
+pam.res <- pam(scaled_df, chosen_k)
  # Visualize pam clustering
 fviz_cluster(pam.res, geom = "point")
 ```
