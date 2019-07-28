@@ -134,6 +134,21 @@ attach(combined_df)
 lm.fit=lm(deltaPANSS~VisitDay+VisitDay:TxGroup)
 summary(lm.fit)
 ```
-We still cannot rule out that there is no effect of treatment on the patient group's change in total PANSS score. 
+We still cannot rule out that there is no effect of treatment on the patient group's change in total PANSS score. Perhaps we can compare just the total positive symptoms of the patient, the total negative symptoms of the patient, and the total general psychopathology symptoms of the patient, to see if there is an effect on those scores. 
+```{r individual scores,echo=FALSE}
+combined_df$totalP=rowSums(combined_df[,c("P1","P2","P3","P4","P5","P6","P7")])
+combined_df$totalN=rowSums(combined_df[,c("N1","N2","N3","N4","N5","N6","N7")])
+combined_df$totalG=rowSums(combined_df[,c("G1","G2","G3","G4","G5","G6","G7","G8","G9","G10","G11","G12","G13","G14","G15","G16")])
+attach(combined_df)
+lm.fit.p=lm(totalP~VisitDay+VisitDay:TxGroup)
+lm.fit.n=lm(totalN~VisitDay+VisitDay:TxGroup)
+lm.fit.g=lm(totalG~VisitDay+VisitDay:TxGroup)
+```
 
+```{r summary of individual lin regs}
+summary(lm.fit.p)
+summary(lm.fit.n)
+summary(lm.fit.g)
+```
 
+Individually, it does not look like there was a statistically significant effect of treatment on the total positive, negative, or general pathophysiology scores. 
