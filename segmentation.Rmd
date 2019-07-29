@@ -26,6 +26,7 @@ knitr::opts_chunk$set(echo = TRUE)
 - Visually this seems like an acceptable result. Both PAM (k-medoids) and k-means are neatly separated along the first principal component in this way into clusters of roughly the same size. The boundary falls right at the zero-point for the first principal component. 
 - This principal component is mostly explained by P2, G15, P1, P6, G9, and G11 respectively in that order. I.e. the patients are mainly separated by how they scored on positive symptoms and general psychology symptoms. 
 - Indeed, the first five contributors for the second principal components are all scores related to negative symptoms (recall there are 7 total negative symptom scores). 
+- Furthermore, coloring the PCA individual plot by study reveals two interesting trends. People in study A have negative values for PC1 and positive values for PC2 (upper left quadrant) while people in study B are to the far right of the graph (represented by positive values of PC1). 
 
 
 # Further reading
@@ -237,6 +238,10 @@ fviz_pca_var(res.pca, col.var="contrib",
              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
              repel = TRUE # Avoid text overlapping
              )
+```
+
+### contributions for each principal component
+```{r pca-contributions}
 
 # Contributions of variables to PC1
 fviz_contrib(res.pca, choice = "var", axes = 1, top = 10)
@@ -248,6 +253,38 @@ fviz_contrib(res.pca, choice = "var", axes = 2, top = 10)
 fviz_contrib(res.pca, choice = "var", axes = 3, top = 10)
 ```
 
+### individuals pca but colored by study
+```{r individuals-country}
+omission_vector = c("Country","PatientID","SiteID","RaterID",
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus")
+combined_all_col = rbind(A_df[ , -which(names(A_df) %in% omission_vector)],B_df[ , -which(names(A_df) %in% omission_vector)],C_df[ , -which(names(A_df) %in% omission_vector)],D_df[ , -which(names(A_df) %in% omission_vector)],E_df[ , -which(names(A_df) %in% omission_vector)])
+
+
+res.pca <- prcomp(combined_all_col[,-1],  scale = TRUE)
+fviz(res.pca, "ind", label = "none",habillage=combined_all_col$Study,addEllipses = "True",alpha=0.3,ellipse.type = "convex") # Individuals plot
+
+res.pca <- prcomp(combined_all_col[,-1],  scale = TRUE)
+fviz(res.pca, "ind", label = "none",habillage=combined_all_col$Study,addEllipses = "True",alpha=0.3) # Individuals plot
+```
+
+### individuals pca but colored by country
+```{r individuals-country}
+omission_vector = c("Study","PatientID","SiteID","RaterID",
+                "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus")
+combined_all_col = rbind(A_df[ , -which(names(A_df) %in% omission_vector)],B_df[ , -which(names(A_df) %in% omission_vector)],C_df[ , -which(names(A_df) %in% omission_vector)],D_df[ , -which(names(A_df) %in% omission_vector)],E_df[ , -which(names(A_df) %in% omission_vector)])
+
+library(plyr)
+sort(table(combined_all_col$Country),decreasing=TRUE)
+
+# consider only top 5 countries 
+countries = c("USA","China","Russia","Japan","Ukraine")
+top_5_country_df = subset(combined_all_col, Country %in% countries)
+
+sum(table(top_5_country_df$Country))/sum(table(combined_all_col$Country)) # these countries make up 80%
+
+res.pca <- prcomp(top_5_country_df[,-1],  scale = TRUE)
+fviz(res.pca, "ind", label = "none",habillage=top_5_country_df$Country,addEllipses = TRUE,alpha=0.5,ellipse.alpha = 0.25)
+```
 
 ## Hierarchical clustering
 ```{r remove-columns-hc}
