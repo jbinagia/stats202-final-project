@@ -122,7 +122,7 @@ print(p)
 
 ### Total PANSS for a given study 
 ```{r total scores for given study}
-study = E_sub
+study = A_sub
 
 treated = study[which(study$TxGroup == "Treatment"),]
 control = study[which(study$TxGroup == "Control"),]

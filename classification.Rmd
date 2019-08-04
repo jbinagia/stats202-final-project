@@ -9,22 +9,35 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# Notes/Assumptions
+- study E only I believe? 
+- predict 18th week total PANSS score 
+- i.e. create a sv file that contains the PatientID and the predicted 18th-week PANSS score
+- can submit predictions here https://www.kaggle.com/c/stanford-stats-202-forecasting/data
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+# Thoughts/Conclusions
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+# Setup
+```{r Load Libraries, results="hide"}
+rm(list = ls()) # clear global environment 
+library(dplyr)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r Load Data}
+A_df=read.csv("Data/Study_A.csv")
+B_df=read.csv("Data/Study_B.csv")
+C_df=read.csv("Data/Study_C.csv")
+D_df=read.csv("Data/Study_D.csv")
+E_df=read.csv("Data/Study_E.csv")
+summary(E_df)
+length(unique(E_df$PatientID))
 ```
+Note that most patients from study E are from USA or Russia (about an even split). 
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+The following creates a list of the patients we should consider for the Kaggle submission. 
+```{r prediction-patients}
+sample_submission_df = read.csv("Data/sample_submission_PANSS.csv")
+prediction.patients = sample_submission_df$PatientID # the PatientID #s we should use for Kaggle submission 
+length(unique(prediction.patients)) # 379 distinct values 
+#n_distinct(prediction.patients)   # gives same result 
+```
