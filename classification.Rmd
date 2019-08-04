@@ -41,3 +41,4 @@ prediction.patients = sample_submission_df$PatientID # the PatientID #s we shoul
 length(unique(prediction.patients)) # 379 distinct values 
 #n_distinct(prediction.patients)   # gives same result 
 ```
+

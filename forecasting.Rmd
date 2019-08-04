@@ -9,18 +9,49 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Notes/Assumptions
+## Notes/Assumptions
+### General 
 - study E only I believe? 
 - predict 18th week total PANSS score 
 - i.e. create a sv file that contains the PatientID and the predicted 18th-week PANSS score
 - can submit predictions here https://www.kaggle.com/c/stanford-stats-202-forecasting/data
+- challanges
+  - typically data in class ranges over time OR over individual. Here we have both. 
+  - we can't average over individuals because we need distinct predictions for each individual given. 
+  - we can't average over time because visitDay is likely a decently strong predictor for the level. 
+  
+### Model 
+  - clearly PANSS total is the response 
+  - likely predictors include
+    - (maybe) study 
+    - Country 
+    - TxGroup
+    - VisitDay
+    - PatientID - this one is tricky. Technically setting a PatientID (I believe??) uniquely determines VisitDay, TxGroup, Country, and Study for our final prediction. HOWEVER, there could be a scenario where two patients completely align on all of these factors EXCEPT for the fact that they are different Patients (in which case including this predictor could be valuable). For example, perhaps patient 1 and patient 2 are identical in all ways except for over the course of the study the former consistently has lower scores. We want this information in our model. 
+  - exclude
+    - individual scores (if you had these, you could simply sum them to get the total score)
+    - SiteID - we don't know where they will be evaluated 
+    - RaterID - we don't know who will evaluate them (see for example https://groups.google.com/forum/#!searchin/stats202/model%7Csort:date/stats202/y7IxH2KYTk4/U-NfpWgGCQAJ)
+  - when it comes time to predict, we specify a patient ID which then sets the above listed predictors except for VisitDay. *For the final predictions, let's assume VisitDay is one week after the given patient's last visit?*
 
-# Thoughts/Conclusions
+### Splitting the data 
+  - Following the suggested methodology found in slide 14 of the lecture 5 slides, we will split the data into 5 parts
+    - test set: the 17th-week for the 379 patients in study E (since ultimately we will be evaluated on the 18th-week scores). Define "17"th-week as second-to-last visit here. We will use the test set to choose between different models. 
+    - training set: half of the remaining observations, combined across datasets. 
+    - development set: the other half of the remaining observations, combined across datasets.  
+    - issues:
+      - study E seems to be distinct in the segmentation plots from the other studies... could be a bias in that there is much more data from the other studies in our training set. 
+  - following suggests combining studies A-D since they are essentially the same https://groups.google.com/forum/#!searchin/stats202/validation%7Csort:date/stats202/ULXRN3seaBE/5DFG-1LmEgAJs
+  - suggests a 70/30 or 70/15/15 split https://www.researchgate.net/post/Is_there_an_ideal_ratio_between_a_training_set_and_validation_set_Which_trade-off_would_you_suggest
+  - ultimately 10-fold CV is probably king for tuning hyper-parameters. 
 
-# Setup
+## Thoughts/Conclusions
+
+## Setup
 ```{r Load Libraries, results="hide"}
 rm(list = ls()) # clear global environment 
-library(dplyr)
+library(plyr)
+library(ggplot2)
 ```
 
 ```{r Load Data}
@@ -38,7 +69,39 @@ The following creates a list of the patients we should consider for the Kaggle s
 ```{r prediction-patients}
 sample_submission_df = read.csv("Data/sample_submission_PANSS.csv")
 prediction.patients = sample_submission_df$PatientID # the PatientID #s we should use for Kaggle submission 
+length(prediction.patients)         # 379 values
 length(unique(prediction.patients)) # 379 distinct values 
 #n_distinct(prediction.patients)   # gives same result 
 ```
 
+How many visits did each patient have?
+```{r number-visits}
+number.visits = count(E_df, vars = "PatientID")
+
+# Basic barplot
+p<-ggplot(data=number.visits, aes(x=PatientID, y=freq)) +
+  geom_bar(stat="identity") # meaning of stat option: "If you want the heights of the bars to represent values in the data, use stat="identity" and map a value to the y aesthetic."
+p
+```
+
+### Reorganize data frame appropriately 
+Remove columns not corresponding to our predictors and response (total PANSS score)
+```{r subset-df}
+A_df = subset(A_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+B_df = subset(B_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+C_df = subset(C_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+D_df = subset(D_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+E_df = subset(E_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+```
+
+Set aside the test set, i.e. the patient's whose score we will predict on Kaggle. 
+```{r test-set}
+test_df = subset(E_df, PatientID %in% prediction.patients)
+dim(test_df)
+```
+
+Combine studies
+```{r combine-studies}
+combined_df = rbind(A_df,B_df,C_df,D_df,E_df)
+summary(combined_df)
+```
