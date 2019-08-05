@@ -49,12 +49,12 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Setup
 ```{r Load Libraries, results="hide"}
-rm(list = ls()) # clear global environment 
 library(plyr)
 library(ggplot2)
 ```
 
 ```{r Load Data}
+rm(list = ls()) # clear global environment 
 A_df=read.csv("Data/Study_A.csv")
 B_df=read.csv("Data/Study_B.csv")
 C_df=read.csv("Data/Study_C.csv")
@@ -64,6 +64,42 @@ summary(E_df)
 length(unique(E_df$PatientID))
 ```
 Note that most patients from study E are from USA or Russia (about an even split). 
+
+We should remove true duplicates from the dataset. Note that assessment ID is a completely unique identifier (no two rows have the same assessment id from examing the raw data in Excel). 
+```{r remove-true-duplicates}
+# # check that there are in fact duplicates 
+# dfList = list(A_df,B_df,C_df,D_df,E_df)
+# for (df in dfList){
+#   print(dim(df))
+#   print(dim(distinct(df)))
+# }
+# 
+# # remove duplicates
+# A_df = distinct(A_df)
+# B_df = distinct(B_df)
+# C_df = distinct(C_df)
+# D_df = distinct(D_df)
+# E_df = distinct(E_df)
+# 
+# # check disregarding assessment id 
+# A_df = A_df[ , -which(names(A_df) %in% c("AssessmentiD"))]
+# B_df = B_df[ , -which(names(B_df) %in% c("AssessmentiD"))]
+# C_df = C_df[ , -which(names(C_df) %in% c("AssessmentiD"))]
+# D_df = D_df[ , -which(names(D_df) %in% c("AssessmentiD"))]
+# E_df = E_df[ , -which(names(E_df) %in% c("AssessmentiD"))]
+# 
+# for (df in dfList){
+#   print(dim(df))
+#   print(dim(distinct(df)))
+# }
+# 
+# # remove duplicates
+# A_df = distinct(A_df)
+# B_df = distinct(B_df)
+# C_df = distinct(C_df)
+# D_df = distinct(D_df)
+# E_df = distinct(E_df)
+```
 
 The following creates a list of the patients we should consider for the Kaggle submission. 
 ```{r prediction-patients}
@@ -76,13 +112,14 @@ length(unique(prediction.patients)) # 379 distinct values
 
 How many visits did each patient have?
 ```{r number-visits}
-number.visits = count(E_df, vars = "PatientID")
-
-# Basic barplot
-p<-ggplot(data=number.visits, aes(x=PatientID, y=freq)) +
-  geom_bar(stat="identity") # meaning of stat option: "If you want the heights of the bars to represent values in the data, use stat="identity" and map a value to the y aesthetic."
-p
+# number.visits = count(E_df, vars = "PatientID")
+# 
+# # Basic barplot
+# p<-ggplot(data=number.visits, aes(x=PatientID, y=freq)) +
+#   geom_bar(stat="identity") # meaning of stat option: "If you want the heights of the bars to represent values in the data, use stat="identity" and map a value to the y aesthetic."
+# p
 ```
+
 
 ### Reorganize data frame appropriately 
 Remove columns not corresponding to our predictors and response (total PANSS score)
@@ -94,14 +131,44 @@ D_df = subset(D_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANS
 E_df = subset(E_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
 ```
 
-Set aside the test set, i.e. the patient's whose score we will predict on Kaggle. 
-```{r test-set}
-test_df = subset(E_df, PatientID %in% prediction.patients)
-dim(test_df)
-```
-
 Combine studies
 ```{r combine-studies}
 combined_df = rbind(A_df,B_df,C_df,D_df,E_df)
 summary(combined_df)
 ```
+
+What was the final visit day for each patient? We need this info since our test set will the final observation for each of the 379 selected study E patients we will evaluate our models on. 
+```{r final-visit-day}
+for (i in 1:dim(combined_df)[1]) {
+  id = combined_df[i,"PatientID"]
+  patient_df = subset(combined_df,PatientID == id)
+  final.day = max(patient_df$VisitDay)
+  #if (final.day==0){ # several patients must have dropped out immediately 
+  #  print(combined_df[i,])
+  #}
+  combined_df[i,"FinalDay"] = final.day
+}
+```
+
+Set aside the test set, i.e. the patient's whose score we will predict on Kaggle. 
+```{r test-set}
+#test_df = combined_df[VisitDay==FinalDay & (PatientID %in% prediction.patients)  , ]
+test_df = subset(combined_df, VisitDay==FinalDay & PatientID %in% prediction.patients)
+dim(test_df)[1] 
+```
+Note that this subsetting does not produce 379 as expected. What is going on here? 
+```{r explore-test-set}
+for (id in unique(test_df$PatientID)) { # for each unique id
+  sub_df = subset(test_df, PatientID==id)
+  if (dim(sub_df)[1]>1){
+    print(sub_df)
+  }
+}
+```
+We see that multiple patients were assessed multiple times on the final day. We can remove such duplicates with the `distinct()` function.
+```{r remove-duplicates}
+library(dplyr)
+test_df = distinct(test_df)
+dim(test_df)[1]
+```
+This still doesn't yield a dataset of size 379 since there are PANSS_Total scores that differ! Thus, there must be patients who were truly assessed multiple times in the same day (for example, PatientID 50505). 

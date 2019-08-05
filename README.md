@@ -1,9 +1,8 @@
 # stats202-final-project
 
 ## To-do
-- part 1
-  - examine treatment effect study-by-study
-  - but study A clearly does not seem to have an effect
+- part 1 and 2
+  - go back and make sure we handled duplicates properly 
 - part 3
   - only use study E for building model?
 - part 4
