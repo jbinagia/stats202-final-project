@@ -202,4 +202,13 @@ dim(combined_df)
 This removes 410 elements as expected. We should also remove any duplicates from here as we did for the test set. 
 
 ```{r remove-training-dups}
+training_df = distinct(combined_df)
+dim(training_df)[1]
+``` 
+We should also average over cases where all is identical except for the total PANSS score: 
+```{r simple-average-training}
+keys <- colnames(training_df)[!grepl('PANSS_Total',colnames(training_df))] # all column names except for PANSS_Total
+X <- as.data.table(training_df)
+training_df = X[,list(mm=mean(PANSS_Total)),keys]
+dim(training_df)
 ```
