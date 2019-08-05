@@ -121,7 +121,7 @@ How many visits did each patient have?
 ```
 
 
-### Reorganize data frame appropriately 
+## Data Cleaning
 Remove columns not corresponding to our predictors and response (total PANSS score)
 ```{r subset-df}
 A_df = subset(A_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
@@ -150,6 +150,7 @@ for (i in 1:dim(combined_df)[1]) {
 }
 ```
 
+### Create test set 
 Set aside the test set, i.e. the patient's whose score we will predict on Kaggle. 
 ```{r test-set}
 #test_df = combined_df[VisitDay==FinalDay & (PatientID %in% prediction.patients)  , ]
@@ -165,10 +166,28 @@ for (id in unique(test_df$PatientID)) { # for each unique id
   }
 }
 ```
-We see that multiple patients were assessed multiple times on the final day. We can remove such duplicates with the `distinct()` function.
+We see that multiple patients were assessed multiple times on the final day (perhaps by different people, at different locations). We can remove such duplicates with the `distinct()` function.
 ```{r remove-duplicates}
 library(dplyr)
 test_df = distinct(test_df)
 dim(test_df)[1]
 ```
-This still doesn't yield a dataset of size 379 since there are PANSS_Total scores that differ! Thus, there must be patients who were truly assessed multiple times in the same day (for example, PatientID 50505). 
+This still doesn't yield a dataset of size 379 since there are PANSS_Total scores that differ! Thus, there must be patients who were assessed multiple times in the same day by the same person and at the same location (for example, PatientID 50505). 
+```{r explore-test-set-v2}
+for (id in unique(test_df$PatientID)) { # for each unique id
+  sub_df = subset(test_df, PatientID==id)
+  if (dim(sub_df)[1]>1){
+    print(sub_df)
+  }
+}
+```
+We see that in each of these cases the difference in PANSS_Total is a few points (except PatientID 50299). Simplest solution is to average over these values: 
+```{r simple-average}
+library(data.table)
+keys <- colnames(test_df)[!grepl('PANSS_Total',colnames(test_df))] # all column names except for PANSS_Total
+X <- as.data.table(test_df)
+test_df = X[,list(mm=mean(PANSS_Total)),keys]
+dim(test_df)
+```
+Which returns the desired number of 379 rows. 
+
