@@ -2,9 +2,9 @@
 
 ## To-do
 - part 1 and 2
-  - go back and make sure we handled duplicates properly
+  - go back and make sure we handled duplicates properly 
 - part 3
-  - submit one model that only trains on study E?
+  - only use study E for building model?
 - part 4
 
 ## Notes from Google Group
