@@ -11,14 +11,14 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Notes/Assumptions
 ### General 
-- study E only I believe? 
-- predict 18th week total PANSS score 
-- i.e. create a sv file that contains the PatientID and the predicted 18th-week PANSS score
+- predict "18th" week total PANSS score 
+- i.e. create a csv file that contains the PatientID and the predicted 18th-week PANSS score
 - can submit predictions here https://www.kaggle.com/c/stanford-stats-202-forecasting/data
-- challanges
+- challenges
   - typically data in class ranges over time OR over individual. Here we have both. 
   - we can't average over individuals because we need distinct predictions for each individual given. 
   - we can't average over time because visitDay is likely a decently strong predictor for the level. 
+- gradient descent reference http://uc-r.github.io/gbm_regression
   
 ### Model 
   - clearly PANSS total is the response 
@@ -183,6 +183,8 @@ for (id in unique(test_df$PatientID)) { # for each unique id
 ```
 We see that in each of these cases the difference in PANSS_Total is a few points (except PatientID 50299). Simplest solution is to average over these values: 
 ```{r simple-average}
+pre_test_df = test_df # save what we have so far ... we will exclude this from the total data 
+
 library(data.table)
 keys <- colnames(test_df)[!grepl('PANSS_Total',colnames(test_df))] # all column names except for PANSS_Total
 X <- as.data.table(test_df)
@@ -191,3 +193,13 @@ dim(test_df)
 ```
 Which returns the desired number of 379 rows. 
 
+### Create training set
+```{r remove-test-from-total}
+dim(combined_df)
+combined_df = anti_join(combined_df, test_df)
+dim(combined_df)
+```
+This removes 410 elements as expected. We should also remove any duplicates from here as we did for the test set. 
+
+```{r remove-training-dups}
+```
