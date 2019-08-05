@@ -19,6 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
   - we can't average over individuals because we need distinct predictions for each individual given. 
   - we can't average over time because visitDay is likely a decently strong predictor for the level. 
 - gradient descent reference http://uc-r.github.io/gbm_regression
+- no need to standardize data if using decision trees!
   
 ### Model 
   - clearly PANSS total is the response 
@@ -36,14 +37,13 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### Splitting the data 
   - Following the suggested methodology found in slide 14 of the lecture 5 slides, we will split the data into 5 parts
-    - test set: the 17th-week for the 379 patients in study E (since ultimately we will be evaluated on the 18th-week scores). Define "17"th-week as second-to-last visit here. We will use the test set to choose between different models. 
-    - training set: half of the remaining observations, combined across datasets. 
-    - development set: the other half of the remaining observations, combined across datasets.  
+    - test set: Start with the 17th-week for the 379 patients in study E (where we define "17"th-week as second-to-last visit) and 7 days to `VisitDay` as a proxy for "18th-week" visit. We will use the test set to choose between different models. 
+    - training/development set: the remaining observations since ultimately we will use k-fold cross-validation.   
     - issues:
       - study E seems to be distinct in the segmentation plots from the other studies... could be a bias in that there is much more data from the other studies in our training set. 
   - following suggests combining studies A-D since they are essentially the same https://groups.google.com/forum/#!searchin/stats202/validation%7Csort:date/stats202/ULXRN3seaBE/5DFG-1LmEgAJs
-  - suggests a 70/30 or 70/15/15 split https://www.researchgate.net/post/Is_there_an_ideal_ratio_between_a_training_set_and_validation_set_Which_trade-off_would_you_suggest
-  - ultimately 10-fold CV is probably king for tuning hyper-parameters. 
+  - suggests a 70/30 or 70/15/15 split for training vs. validation https://www.researchgate.net/post/Is_there_an_ideal_ratio_between_a_training_set_and_validation_set_Which_trade-off_would_you_suggest
+  
 
 ## Thoughts/Conclusions
 
@@ -194,13 +194,22 @@ dim(test_df)
 ```
 Which returns the desired number of 379 rows. 
 
+Finally, we would like our test set to best reflect the "18-th week" visit. To do so, we imagine each patient going back for assessment one week after whenever their final week was. So we add a value of 7 days to their `VisitDay`. We also drop the `FinalDay` column at this point. Also potentially scale the data here. 
+```{r create-test-set}
+test_df = subset(test_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+#test_df$PatientID = scale(test_df$PatientID)
+#test_df$VisitDay = test_df$VisitDay + 7 
+#test_df$VisitDay = scale(test_df$VisitDay)
+#test_df$PANSS_Total = scale(test_df$PANSS_Total)
+```
+
 ### Create training set
 ```{r remove-test-from-total}
-dim(combined_df)
-combined_df = anti_join(combined_df, test_df)
-dim(combined_df)
+# dim(combined_df)
+# combined_df = anti_join(combined_df, test_df)
+# dim(combined_df)
 ```
-This removes 410 elements as expected. We should also remove any duplicates from here as we did for the test set. 
+This removes 410 elements as expected. We should also remove any duplicates from here as we did for the test set. Note that I ended up not removing these 410 observations since I considered them distinct from the test set (the test set has VisitDay shifted upwards by a value of 7).  
 
 ```{r remove-training-dups}
 training_df = distinct(combined_df)
@@ -213,6 +222,15 @@ X <- as.data.table(training_df)
 training_df = X[,list(mm=mean(PANSS_Total)),keys]
 names(training_df)[7] = "PANSS_Total"
 dim(training_df)
+
+training_df = subset(training_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+```
+
+Finally, we may want to scale some variables.
+```{r training-scale}
+#test_df$PatientID = scale(test_df$PatientID)
+#test_df$VisitDay = scale(test_df$VisitDay)
+#test_df$PANSS_Total = scale(test_df$PANSS_Total)
 ```
 
 ## Gradient Boosting (gbm)
@@ -226,9 +244,9 @@ gbm.fit <- gbm(
   formula = PANSS_Total ~ .,
   distribution = "gaussian",
   data = training_df,
-  n.trees = 10000,
-  interaction.depth = 1, 
-  shrinkage = 0.001,
+  n.trees = 5000,
+  interaction.depth = 5, # 3 is optimal. 1 led to decrease. 
+  shrinkage = 0.1,
   cv.folds = 10,
   n.cores = NULL, # will use all cores by default
   verbose = FALSE
@@ -244,11 +262,11 @@ print(gbm.fit)
 ## The best cross-validation iteration was 10000.
 ## There were 80 predictors of which 45 had non-zero influence.
 ```
+Displayed values are best so far, as found via manual tuning. 
 
 ```{r visualize-boosting}
-# get MSE and compute RMSE
+# get MSE
 min(gbm.fit$cv.error)
-sqrt(min(gbm.fit$cv.error))
 
 # plot loss function as a result of n trees added to the ensemble
 gbm.perf(gbm.fit, method = "cv")
@@ -259,9 +277,9 @@ gbm.perf(gbm.fit, method = "cv")
 # create hyperparameter grid
 hyper_grid <- expand.grid(
   shrinkage = c(.01, .1, .3),
-  interaction.depth = c(1, 2, 4, 6),
+  interaction.depth = c(1, 3, 5),
   n.minobsinnode = c(5, 10, 15),
-  bag.fraction = c(.65, .8, 1), 
+  bag.fraction = c(.65, .8, 1),    # introduce stochastic gradient descent by allowing bag.fraction < 1
   optimal_trees = 0,               # a place to dump results
   min_RMSE = 0                     # a place to dump results
 )
@@ -282,7 +300,7 @@ for(i in 1:nrow(hyper_grid)) {
   
   # train model
   gbm.tune <- gbm(
-    formula = Sale_Price ~ .,
+    formula = PANSS_Total ~ .,
     distribution = "gaussian",
     data = random_training_df,
     n.trees = 5000,
@@ -305,6 +323,25 @@ hyper_grid %>%
   head(10)
 ```
 
+```{r train-top-gbm-model}
+set.seed(1)
+
+# train GBM model
+gbm.fit.final <- gbm(
+  formula = PANSS_Total ~ .,
+  distribution = "gaussian",
+  data = training_df,
+  n.trees = 5000,
+  interaction.depth = 3,
+  shrinkage = 0.1,
+  n.minobsinnode = 5,
+  bag.fraction = .65, 
+  train.fraction = 1,
+  n.cores = NULL, # will use all cores by default
+  verbose = FALSE
+  )
+```
+
 ### Visualize
 ```{r gbm-visualize}
 par(mar = c(5, 8, 1, 1))
@@ -319,20 +356,168 @@ summary(
 ### Prediction
 ```{r gbm-prediction}
 # predict values for test data
-pred <- predict(gbm.fit.final, n.trees = gbm.fit.final$n.trees, ames_test)
+pred <- predict(gbm.fit.final, n.trees = gbm.fit.final$n.trees, test_df)
 
 # results
-caret::RMSE(pred, ames_test$Sale_Price)
+caret::RMSE(pred, test_df$PANSS_Total)
+
+# write to csv for Kaggle submission
+write.csv(pred,'healthstudy2.csv')
 ```
 
 ## Gradient Boosting (xgboost)
+### xgboost setup
+```{r xgboost-setup}
+# variable names
+features <- setdiff(names(ames_train), "Sale_Price")
+
+# Create the treatment plan from the training data
+treatplan <- vtreat::designTreatmentsZ(ames_train, features, verbose = FALSE)
+
+# Get the "clean" variable names from the scoreFrame
+new_vars <- treatplan %>%
+  magrittr::use_series(scoreFrame) %>%        
+  dplyr::filter(code %in% c("clean", "lev")) %>% 
+  magrittr::use_series(varName)     
+
+# Prepare the training data
+features_train <- vtreat::prepare(treatplan, ames_train, varRestriction = new_vars) %>% as.matrix()
+response_train <- ames_train$Sale_Price
+
+# Prepare the test data
+features_test <- vtreat::prepare(treatplan, ames_test, varRestriction = new_vars) %>% as.matrix()
+response_test <- ames_test$Sale_Price
+
+# dimensions of one-hot encoded data
+dim(features_train)
+dim(features_test)
+```
+
+```{r sample-xgboost-fit}
+# reproducibility
+set.seed(123)
+
+xgb.fit1 <- xgb.cv(
+  data = features_train,
+  label = response_train,
+  nrounds = 1000,
+  nfold = 5,
+  objective = "reg:linear",  # for regression models
+  verbose = 0,               # silent,
+  early_stopping_rounds = 10 # stop if no improvement for 10 consecutive trees
+)
+```
+
+```{r xgboost-visualize}
+# get number of trees that minimize error
+xgb.fit1$evaluation_log %>%
+  dplyr::summarise(
+    ntrees.train = which(train_rmse_mean == min(train_rmse_mean))[1],
+    rmse.train   = min(train_rmse_mean),
+    ntrees.test  = which(test_rmse_mean == min(test_rmse_mean))[1],
+    rmse.test   = min(test_rmse_mean),
+  )
+##   ntrees.train rmse.train ntrees.test rmse.test
+## 1          965  0.5022836          60  27572.31
+
+# plot error vs number trees
+ggplot(xgb.fit1$evaluation_log) +
+  geom_line(aes(iter, train_rmse_mean), color = "red") +
+  geom_line(aes(iter, test_rmse_mean), color = "blue")
+```
+
+### xgboost Tuning 
+```{r xgboost-grid}
+# create hyperparameter grid
+hyper_grid <- expand.grid(
+  eta = c(.01, .05, .1, .3),
+  max_depth = c(1, 3, 5, 7),
+  min_child_weight = c(1, 3, 5, 7),
+  subsample = c(.65, .8, 1), 
+  colsample_bytree = c(.8, .9, 1),
+  optimal_trees = 0,               # a place to dump results
+  min_RMSE = 0                     # a place to dump results
+)
+
+nrow(hyper_grid)
+```
+
+```{r xgboost-grid-search}
+# grid search 
+for(i in 1:nrow(hyper_grid)) {
+  
+  # create parameter list
+  params <- list(
+    eta = hyper_grid$eta[i],
+    max_depth = hyper_grid$max_depth[i],
+    min_child_weight = hyper_grid$min_child_weight[i],
+    subsample = hyper_grid$subsample[i],
+    colsample_bytree = hyper_grid$colsample_bytree[i]
+  )
+  
+  # reproducibility
+  set.seed(123)
+  
+  # train model
+  xgb.tune <- xgb.cv(
+    params = params,
+    data = features_train,
+    label = response_train,
+    nrounds = 5000,
+    nfold = 5,
+    objective = "reg:linear",  # for regression models
+    verbose = 0,               # silent,
+    early_stopping_rounds = 10 # stop if no improvement for 10 consecutive trees
+  )
+  
+  # add min training error and trees to grid
+  hyper_grid$optimal_trees[i] <- which.min(xgb.tune$evaluation_log$test_rmse_mean)
+  hyper_grid$min_RMSE[i] <- min(xgb.tune$evaluation_log$test_rmse_mean)
+}
+
+hyper_grid %>%
+  dplyr::arrange(min_RMSE) %>%
+  head(10)
+```
+
+```{r xgboost-fit-final}
+# parameter list
+params <- list(
+  eta = 0.01,
+  max_depth = 5,
+  min_child_weight = 5,
+  subsample = 0.65,
+  colsample_bytree = 1
+)
+
+# train final model
+xgb.fit.final <- xgboost(
+  params = params,
+  data = features_train,
+  label = response_train,
+  nrounds = 1576,
+  objective = "reg:linear",
+  verbose = 0
+)
+```
+
+### Visualization 
+
+### Prediciton
+```{r xgboost-prediction}
+# predict values for test data
+pred <- predict(xgb.fit.final, test_df)
+
+# results
+caret::RMSE(pred, response_test)
+```
 
 
 ## Gradient Boosting (h2o)
 ```{r h20-startup}
 library(h2o)          # a java-based platform
 h2o.no_progress()
-h2o.init(max_mem_size = "5g")
+h2o.init(max_mem_size = "10g") # have 16g total 
 ```
 
 ```{r h20-model}
@@ -348,14 +533,14 @@ h2o.fit1 <- h2o.gbm(
   x = x,
   y = y,
   training_frame = train.h2o,
-  nfolds = 5
+  nfolds = 10
 )
 
 # assess model results
 h2o.fit1
 ```
 
-```{r h20-automated}
+```{r h20-automated-stopping}
 # training basic GBM model with defaults
 h2o.fit2 <- h2o.gbm(
   x = x,
@@ -365,14 +550,15 @@ h2o.fit2 <- h2o.gbm(
   ntrees = 10000,
   stopping_rounds = 10,
   stopping_tolerance = 0,
-  seed = 1
+  seed = 1,
+  max_runtime_secs = 60*5
 )
 
 # model stopped after xx trees
 h2o.fit2@parameters$ntrees
 
-# cross validated RMSE
-h2o.rmse(h2o.fit2, xval = TRUE)
+# cross validated MSE
+h2o.rmse(h2o.fit2, xval = TRUE)^2
 ```
 
 ### Full grid search
@@ -384,10 +570,10 @@ valid <- split[[2]]
 
 # create hyperparameter grid
 hyper_grid <- list(
-  max_depth = c(1, 3, 5),
-  min_rows = c(1, 5, 10),
+  max_depth = c(1,5,10),
+  min_rows = c(1, 5, 10), # minimum observations in a terminal node
   learn_rate = c(0.01, 0.05, 0.1),
-  learn_rate_annealing = c(.99, 1),
+  learn_rate_annealing = c(1),
   sample_rate = c(.4, .6, .8, 1),
   col_sample_rate = c(.8, .9, 1)
 )
@@ -423,8 +609,8 @@ search_criteria <- list(
   strategy = "RandomDiscrete",
   stopping_metric = "mse",
   stopping_tolerance = 0.005,
-  stopping_rounds = 10,
-  max_runtime_secs = 60*60
+  stopping_rounds = 10,   # stop if 10 consecutive trees have no improvement 
+  max_runtime_secs = 60*5 # limit how long it runs
   )
 
 # perform grid search 
@@ -438,7 +624,7 @@ grid <- h2o.grid(
   hyper_params = hyper_grid,
   search_criteria = search_criteria, # add search criteria
   ntrees = 1000,
-  stopping_rounds = 10,
+  stopping_rounds = 10, 
   stopping_tolerance = 0,
   seed = 123
   )
@@ -451,6 +637,8 @@ grid_perf <- h2o.getGrid(
   )
 grid_perf
 ```
+
+62 models took 5 mins to evaluate. Top 5 models after 5 mins all had max_depth of 5. Top 4 has min_rows = 1. All had learning rate > 0.05. 
 
 ```{r h20-performance}
 # Grab the model_id for the top model, chosen by validation error
@@ -467,30 +655,24 @@ h2o.final <- h2o.gbm(
   x = x,
   y = y,
   training_frame = train.h2o,
-<<<<<<< HEAD
   nfolds = 10,
-  ntrees = 5000,
-  learn_rate = 0.1,
-=======
-  nfolds = 5,
   ntrees = 10000,
-  learn_rate = 0.01,
->>>>>>> parent of 2ca28a6... Lots of progress on using h2o for forecasting.
+  learn_rate = 0.1,
   learn_rate_annealing = 1,
-  max_depth = 3,
-  min_rows = 10,
-  sample_rate = 0.75,
-  col_sample_rate = 1,
+  max_depth = 5,
+  min_rows = 1,
+  sample_rate = 0.6,
+  col_sample_rate = 0.9,
   stopping_rounds = 10,
   stopping_tolerance = 0,
-  seed = 123
+  seed = 1
 )
 
 # model stopped after xx trees
 h2o.final@parameters$ntrees
 
-# cross validated RMSE
-h2o.rmse(h2o.final, xval = TRUE)
+# cross validated MSE
+h2o.rmse(h2o.final, xval = TRUE)^2
 ```
 
 ### Visualization
@@ -511,4 +693,7 @@ h2o.predict(h2o.final, newdata = test.h2o)
 
 # predict values with predict
 predict(h2o.final, test.h2o)
+
+# write to csv for Kaggle submission
+write.csv(pred,'healthstudy2.csv')
 ```
