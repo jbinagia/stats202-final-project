@@ -4,6 +4,11 @@
 - part 1 and 2
   - go back and make sure we handled duplicates properly
 - part 3
+  - 8/5/19
+    - Reading two training guides
+    - Create a test set for which we know the true answer and can see how we did
+    - Create a prediction set that is test set with visit day shifted by 7
+    - Submit to Kaggle twice
   - submit one model that only trains on study E?
 - part 4
 
