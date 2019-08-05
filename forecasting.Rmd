@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls()) # clear global environment 
 ```
 
 ## Notes/Assumptions
@@ -49,6 +50,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Setup
 ```{r Load Libraries, results="hide"}
+rm(list = ls()) # clear global environment 
 library(plyr)
 library(ggplot2)
 ```
