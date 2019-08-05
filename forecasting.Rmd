@@ -710,8 +710,8 @@ set.seed(1)
 # default RF model
 m1 <- randomForest(
   formula = PANSS_Total ~ .,
-  data    = training_df[,-"PatientID"]
-  #mtry = 3 # try 2 or 3 
+  data    = training_df[,-"PatientID"],
+  mtry = 2
 )
 
 m1
@@ -762,21 +762,6 @@ tibble::tibble(
   xlab("Number of trees")
 ```
 
-### Tuning
-We will now tune the hyperparameters. Note that we only have a few predictors, so we wills can `mtry` from 2 to 4. 
-```{r rf-initial-tuning}
-# set.seed(1)
-# m2 <- tuneRF(
-#   x          = training_df[,-c("PatientID","PANSS_Total")],
-#   y          = training_df$PAMSS_Total,
-#   ntreeTry   = 500,
-#   mtryStart  = 2,
-#   stepFactor = 1.5,
-#   improve    = 0.01,
-#   trace      = FALSE      # to not show real-time progress 
-# )
-```
-
 ### Tuning via h2o
 ```{r h2o-rf}
 # start up h2o 
@@ -791,12 +776,12 @@ train.h2o <- as.h2o(training_df[,-"PatientID"])
 
 # hyperparameter grid
 hyper_grid.h2o <- list(
-  ntrees      = seq(200, 500, by = 150),
-  mtries      = seq(2,4, by = 1),
+  ntrees      = seq(350, 500, by = 75), 
+  mtries      = 2, 
   max_depth   = seq(20, 40, by = 5),
-  min_rows    = seq(1, 5, by = 2),
+  min_rows    = seq(5, 10, by = 2),
   nbins       = seq(10, 30, by = 5),
-  sample_rate = c(.55, .632, .75)
+  sample_rate = c(0.45,.55, .65) 
 )
 
 # random grid search criteria
@@ -805,7 +790,7 @@ search_criteria <- list(
   stopping_metric = "mse",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 10*60
+  max_runtime_secs = 30*60
   )
 
 # build grid search 
@@ -827,6 +812,28 @@ grid_perf2 <- h2o.getGrid(
   )
 print(grid_perf2)
 ```
+```{r h20-cv-notes}
+# first grid
+hyper_grid.h2o <- list(
+  ntrees      = seq(200, 500, by = 150), # best all had 350 min so set 350 as new min
+  mtries      = seq(2,4, by = 1), # best all have 2 so set this identically to 2 
+  max_depth   = seq(20, 40, by = 5),
+  min_rows    = seq(1, 5, by = 2), # best all have 5 (so set 5 as min) 
+  nbins       = seq(10, 30, by = 5),
+  sample_rate = c(.55, .632, .75) # best all have 0.55 so vary around this 
+) # best model from this one has test MSE of 131.2987 
+
+# new grid
+hyper_grid.h2o <- list(
+  ntrees      = seq(350, 500, by = 75), 
+  mtries      = 2, 
+  max_depth   = seq(20, 40, by = 5),
+  min_rows    = seq(5, 10, by = 2),
+  nbins       = seq(10, 30, by = 5),
+  sample_rate = c(0.45,.55, .65) 
+)
+```
+
 
 ```{r h2o-rf-evaluate}
 # Grab the model_id for the top model, chosen by validation error
@@ -838,5 +845,5 @@ test_df.h2o <- as.h2o(test_df)
 best_model_perf <- h2o.performance(model = best_model, newdata = test_df.h2o)
 
 # RMSE of best model
-h2o.mse(best_model_perf) %>% sqrt()
+h2o.mse(best_model_perf) 
 ```
