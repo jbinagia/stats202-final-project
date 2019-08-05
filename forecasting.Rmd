@@ -189,6 +189,7 @@ library(data.table)
 keys <- colnames(test_df)[!grepl('PANSS_Total',colnames(test_df))] # all column names except for PANSS_Total
 X <- as.data.table(test_df)
 test_df = X[,list(mm=mean(PANSS_Total)),keys]
+names(test_df)[7] = "PANSS_Total"
 dim(test_df)
 ```
 Which returns the desired number of 379 rows. 
@@ -210,5 +211,53 @@ We should also average over cases where all is identical except for the total PA
 keys <- colnames(training_df)[!grepl('PANSS_Total',colnames(training_df))] # all column names except for PANSS_Total
 X <- as.data.table(training_df)
 training_df = X[,list(mm=mean(PANSS_Total)),keys]
+names(training_df)[7] = "PANSS_Total"
 dim(training_df)
 ```
+
+## Gradient Boosting (gbm)
+Note that in this section we make frequent use of code snippets given by http://uc-r.github.io/gbm_regression. 
+```{r gboost}
+set.seed(1)
+library(gbm)          # basic implementation
+
+# train GBM model
+gbm.fit <- gbm(
+  formula = PANSS_Total ~ .,
+  distribution = "gaussian",
+  data = training_df,
+  n.trees = 5000,
+  interaction.depth = 1, 
+  shrinkage = 0.01,
+  cv.folds = 10,
+  n.cores = NULL, # will use all cores by default
+  verbose = FALSE
+  )  
+
+# print results
+print(gbm.fit)
+## gbm(formula = Sale_Price ~ ., distribution = "gaussian", data = ames_train, 
+##     n.trees = 10000, interaction.depth = 1, shrinkage = 0.001, 
+##     cv.folds = 5, verbose = FALSE, n.cores = NULL)
+## A gradient boosted model with gaussian loss function.
+## 10000 iterations were performed.
+## The best cross-validation iteration was 10000.
+## There were 80 predictors of which 45 had non-zero influence.
+```
+
+```{r visualize-boosting}
+# get MSE and compute RMSE
+min(gbm.fit$cv.error)
+sqrt(min(gbm.fit$cv.error))
+
+# plot loss function as a result of n trees added to the ensemble
+gbm.perf(gbm.fit, method = "cv")
+```
+
+### Tune boosting 
+
+## Gradient Boosting (xgboost)
+
+
+
+## Gradient Boosting (h2o)
