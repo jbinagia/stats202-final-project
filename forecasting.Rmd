@@ -226,7 +226,7 @@ gbm.fit <- gbm(
   formula = PANSS_Total ~ .,
   distribution = "gaussian",
   data = training_df,
-  n.trees = 1000,
+  n.trees = 10000,
   interaction.depth = 1, 
   shrinkage = 0.001,
   cv.folds = 10,
@@ -236,7 +236,7 @@ gbm.fit <- gbm(
 
 # print results
 print(gbm.fit)
-## gbm(formula = Sale_Price ~ ., distribution = "gaussian", data = ames_train, 
+## gbm(formula = Sale_Price ~ ., distribution = "gaussian", data = training_df, 
 ##     n.trees = 10000, interaction.depth = 1, shrinkage = 0.001, 
 ##     cv.folds = 5, verbose = FALSE, n.cores = NULL)
 ## A gradient boosted model with gaussian loss function.
@@ -255,9 +255,77 @@ gbm.perf(gbm.fit, method = "cv")
 ```
 
 ### Tune boosting 
+```{r gbm-tuning}
+# create hyperparameter grid
+hyper_grid <- expand.grid(
+  shrinkage = c(.01, .1, .3),
+  interaction.depth = c(1, 2, 4, 6),
+  n.minobsinnode = c(5, 10, 15),
+  bag.fraction = c(.65, .8, 1), 
+  optimal_trees = 0,               # a place to dump results
+  min_RMSE = 0                     # a place to dump results
+)
+
+# total number of combinations
+nrow(hyper_grid)
+
+
+# randomize data
+random_index <- sample(1:nrow(training_df), nrow(training_df))
+random_training_df <- training_df[random_index, ]
+
+# grid search 
+for(i in 1:nrow(hyper_grid)) {
+  
+  # reproducibility
+  set.seed(123)
+  
+  # train model
+  gbm.tune <- gbm(
+    formula = Sale_Price ~ .,
+    distribution = "gaussian",
+    data = random_training_df,
+    n.trees = 5000,
+    interaction.depth = hyper_grid$interaction.depth[i],
+    shrinkage = hyper_grid$shrinkage[i],
+    n.minobsinnode = hyper_grid$n.minobsinnode[i],
+    bag.fraction = hyper_grid$bag.fraction[i],
+    train.fraction = .75,
+    n.cores = NULL, # will use all cores by default
+    verbose = FALSE
+  )
+  
+  # add min training error and trees to grid
+  hyper_grid$optimal_trees[i] <- which.min(gbm.tune$valid.error)
+  hyper_grid$min_RMSE[i] <- sqrt(min(gbm.tune$valid.error))
+}
+
+hyper_grid %>% 
+  dplyr::arrange(min_RMSE) %>%
+  head(10)
+```
+
+### Visualize
+```{r gbm-visualize}
+par(mar = c(5, 8, 1, 1))
+summary(
+  gbm.fit.final, 
+  cBars = 10,
+  method = relative.influence, # also can use permutation.test.gbm
+  las = 2
+  )
+```
+
+### Prediction
+```{r gbm-prediction}
+# predict values for test data
+pred <- predict(gbm.fit.final, n.trees = gbm.fit.final$n.trees, ames_test)
+
+# results
+caret::RMSE(pred, ames_test$Sale_Price)
+```
 
 ## Gradient Boosting (xgboost)
-
 
 
 ## Gradient Boosting (h2o)
@@ -323,6 +391,29 @@ hyper_grid <- list(
   sample_rate = c(.4, .6, .8, 1),
   col_sample_rate = c(.8, .9, 1)
 )
+
+# # perform grid search 
+# grid <- h2o.grid(
+#   algorithm = "gbm",
+#   grid_id = "gbm_grid1",
+#   x = x, 
+#   y = y, 
+#   training_frame = train,
+#   validation_frame = valid,
+#   hyper_params = hyper_grid,
+#   ntrees = 5000,
+#   stopping_rounds = 10,
+#   stopping_tolerance = 0,
+#   seed = 123
+#   )
+# 
+# # collect the results and sort by our model performance metric of choice
+# grid_perf <- h2o.getGrid(
+#   grid_id = "gbm_grid1", 
+#   sort_by = "mse", 
+#   decreasing = FALSE
+#   )
+# grid_perf
 ```
 
 ### Random discrete grid search 
@@ -399,4 +490,19 @@ h2o.rmse(h2o.final, xval = TRUE)
 ### Visualization
 ```{r variable-importance}
 h2o.varimp_plot(h2o.final, num_of_features = 10)
+```
+
+### Prediction
+```{r h20-prediction}
+# convert test set to h2o object
+test.h2o <- as.h2o(test_df)
+
+# evaluate performance on new data
+h2o.performance(model = h2o.final, newdata = test.h2o)
+
+# predict with h2o.predict
+h2o.predict(h2o.final, newdata = test.h2o)
+
+# predict values with predict
+predict(h2o.final, test.h2o)
 ```
