@@ -128,11 +128,16 @@ How many visits did each patient have?
 ## Data Cleaning
 Remove columns not corresponding to our predictors and response (total PANSS score)
 ```{r subset-df}
-A_df = subset(A_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
-B_df = subset(B_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
-C_df = subset(C_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
-D_df = subset(D_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
-E_df = subset(E_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+#A_df = subset(A_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+#B_df = subset(B_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+#C_df = subset(C_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+#D_df = subset(D_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+#E_df = subset(E_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+A_df = subset(A_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
+B_df = subset(B_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
+C_df = subset(C_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
+D_df = subset(D_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
+E_df = subset(E_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
 ```
 
 Combine studies
@@ -193,17 +198,19 @@ library(data.table)
 keys <- colnames(test_df)[!grepl('PANSS_Total',colnames(test_df))] # all column names except for PANSS_Total
 X <- as.data.table(test_df)
 test_df = X[,list(mm=mean(PANSS_Total)),keys]
-names(test_df)[7] = "PANSS_Total"
+names(test_df)[length(names(test_df))] = "PANSS_Total"
 dim(test_df)
 ```
 Which returns the desired number of 379 rows. 
 
 Finally, we would like our actually forecasting set to best reflect the "18-th week" visit. To do so, we imagine each patient going back for assessment one week after whenever their final week was. So we add a value of 7 days to their `VisitDay`. We also drop the `FinalDay` column at this point. Also potentially scale the data here. 
 ```{r create-test-set}
-test_df = subset(test_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+#test_df = subset(test_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+test_df = subset(test_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
 
 forecast_df = test_df
-forecast_df = subset(forecast_df, select = c(PatientID, Country, TxGroup, VisitDay, Study))
+#forecast_df = subset(forecast_df, select = c(PatientID, Country, TxGroup, VisitDay, Study))
+forecast_df = subset(forecast_df, select = c(PatientID, Country, VisitDay, Study))
 forecast_df$VisitDay = forecast_df$VisitDay + 7 
 #test_df$PatientID = scale(test_df$PatientID)
 #test_df$VisitDay = scale(test_df$VisitDay)
@@ -227,10 +234,10 @@ We should also average over cases where all is identical except for the total PA
 keys <- colnames(training_df)[!grepl('PANSS_Total',colnames(training_df))] # all column names except for PANSS_Total
 X <- as.data.table(training_df)
 training_df = X[,list(mm=mean(PANSS_Total)),keys]
-names(training_df)[7] = "PANSS_Total"
+names(training_df)[length(names(training_df))] = "PANSS_Total"
 dim(training_df)
-
-training_df = subset(training_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+#training_df = subset(training_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+training_df = subset(training_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
 ```
 
 While we could scale some variables, scaling does not matter for decision trees! 
@@ -523,7 +530,7 @@ While we could scale some variables, scaling does not matter for decision trees!
 ## Gradient Boosting (h2o)
 <!-- ```{r h20-startup} -->
 <!-- h2o.no_progress() -->
-<!-- h2o.init(max_mem_size = "8g") # have 16g ram total  -->
+<!-- h2o.init(max_mem_size = "6g") # have 16g ram total  -->
 <!-- ``` -->
 
 
@@ -765,7 +772,7 @@ tibble::tibble(
 ### Tuning via h2o
 ```{r h2o-rf}
 # start up h2o
-h2o.init(max_mem_size = "8g")
+h2o.init(max_mem_size = "6g")
 set.seed(1)
 
 # create feature names
@@ -779,15 +786,15 @@ train.h2o <- as.h2o(training_df[,-"PatientID"])
 #x <- setdiff(names(training_df[,-c("PatientID","Study")]), y)
 #train.h2o <- as.h2o(subset(training_df, Study=="E",select=c(Country, TxGroup, VisitDay, PANSS_Total)))
 
-# hyperparameter grid
+# second hypergrid
 hyper_grid.h2o <- list(
-  ntrees      = seq(300, 450, by = 50), 
+  ntrees      = seq(300, 550, by = 50), 
   mtries      = 2,
-  max_depth   = seq(15, 35, by = 5),
-  min_rows    = seq(7, 10, by = 1), 
-  nbins       = seq(15, 30, by = 5),
-  sample_rate = c(0.35,0.45,.55) 
-) 
+  max_depth   = seq(20, 40, by = 5), 
+  min_rows    = seq(8, 10, by = 1), 
+  nbins       = seq(5, 30, by = 5), 
+  sample_rate = c(0.5,0.55,.6,.65,.7) 
+)
 
 # random grid search criteria
 search_criteria <- list(
@@ -795,7 +802,7 @@ search_criteria <- list(
   stopping_metric = "mse",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 30*60
+  max_runtime_secs = 60*60
   )
 
 # build grid search
@@ -817,6 +824,7 @@ grid_perf2 <- h2o.getGrid(
   )
 print(grid_perf2)
 ```
+
 ```{r h20-cv-notes}
 # first grid
 hyper_grid.h2o <- list(
@@ -836,17 +844,7 @@ hyper_grid.h2o <- list(
   min_rows    = seq(5, 10, by = 2), # none of the top 5 models use 5 
   nbins       = seq(10, 30, by = 5), # none of top 5 use 10 
   sample_rate = c(0.45,.55, .65) # none of the top 5 models use sample_rate of 0.65 
-) # best model from this has test MSE of 131.1589. best model while using study E gave 130.52. Latter scored 121.37919 on the public leaderboard.
-
-# third hypergrid
-hyper_grid.h2o <- list(
-  ntrees      = seq(300, 450, by = 50), 
-  mtries      = 2,
-  max_depth   = seq(15, 35, by = 5),
-  min_rows    = seq(7, 10, by = 1), 
-  nbins       = seq(15, 30, by = 5),
-  sample_rate = c(0.35,0.45,.55) 
-) 
+) # best model from this has test MSE of 131.1589. best model while using study E gave 130.52. Latter scored 121.37919 on the public leaderboard. second time I ran this I had test MSE of 131.2212. Scored almost the same on Kaggle than when I dropped everything but Study E. 
 ```
 
 
@@ -854,10 +852,16 @@ hyper_grid.h2o <- list(
 # Grab the model_id for the top model, chosen by validation error
 best_model_id <- grid_perf2@model_ids[[1]]
 best_model <- h2o.getModel(best_model_id)
+h2o.varimp_plot(best_model)
 
 # Now let’s evaluate the model performance on a test set
 test_df.h2o <- as.h2o(test_df)
 best_model_perf <- h2o.performance(model = best_model, newdata = test_df.h2o)
+
+# View prediction 
+prediction = predict(best_model, test_df.h2o) 
+plot(as.vector(prediction), test_df$PANSS_Total)
+abline(0,1) # line with y-intercept 0 and slope 1 
 
 # RMSE of best model
 h2o.mse(best_model_perf)
