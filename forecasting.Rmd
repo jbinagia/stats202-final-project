@@ -38,7 +38,8 @@ library(ggplot2)
     - individual scores (if you had these, you could simply sum them to get the total score)
     - SiteID - we don't know where they will be evaluated 
     - RaterID - we don't know who will evaluate them (see for example https://groups.google.com/forum/#!searchin/stats202/model%7Csort:date/stats202/y7IxH2KYTk4/U-NfpWgGCQAJ)
-  - when it comes time to predict, we specify a patient ID which then sets the above listed predictors except for VisitDay. *For the final predictions, let's assume VisitDay is one week after the given patient's last visit?*
+  - when it comes time to predict, we specify a patient ID which then sets the above listed predictors except for VisitDay. 
+  For the final predictions, let's assume VisitDay is one week after the given patient's last visit.
 
 ### Splitting the data 
   - Following the suggested methodology found in slide 14 of the lecture 5 slides, we will split the data as follows:
@@ -53,7 +54,7 @@ library(ggplot2)
 ### Algorithms
 - xgboost strictly better than using gbm. h2o is a software that has a wrapper for xgboost. 
 - don't use forecast methods like exponential smoothing since we don't have a single timeseries (like the stock market price for example) 
-  
+  -> ?? But we could make a "ranked" time series where t = number of days from baseline visit for each patient = VisitDay
 
 ## Thoughts/Conclusions
 - decision trees are likely ill-suited for this dataset https://stats.stackexchange.com/questions/235189/random-forest-regression-not-predicting-higher-than-training-data
@@ -191,6 +192,7 @@ for (id in unique(test_df$PatientID)) { # for each unique id
     print(sub_df)
   }
 }
+test_df
 ```
 We see that in each of these cases the difference in PANSS_Total is a few points (except PatientID 50299). Simplest solution is to average over these values: 
 ```{r simple-average}
@@ -227,7 +229,10 @@ dim(combined_df)
 combined_df = anti_join(combined_df, test_df)
 dim(combined_df)
 ```
-This removes 410 elements as expected. We should also remove any duplicates from here as we did for the test set. Note that I ended up not removing these 410 observations since I considered them distinct from the test set (the test set has VisitDay shifted upwards by a value of 7).  
+This removes 410 elements as expected. We should also remove any duplicates from here as we did for the test set. 
+
+"Note that we ended up not removing these 410 observations since I considered them distinct from the test set (the test set has VisitDay shifted upwards by a value of 7).": -> we should remove these, and not do the + 7 for the test set. You did remove them above. 
+
 
 ```{r remove-training-dups}
 training_df = distinct(combined_df)
