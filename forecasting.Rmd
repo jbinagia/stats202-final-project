@@ -215,6 +215,9 @@ forecast_df = subset(forecast_df, select = c(PatientID, Country, TxGroup, VisitD
 forecast_df$VisitDay = forecast_df$VisitDay + 7 
 #test_df$VisitDay = scale(test_df$VisitDay)
 #test_df$PANSS_Total = scale(test_df$PANSS_Total)
+
+# create "Naive" submission 
+write.csv(test_df[,c("PatientID","PANSS_Total")],'naive-forecast.csv',row.names=FALSE)
 ```
 
 ### Create training set

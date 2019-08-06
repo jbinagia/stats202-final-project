@@ -9,6 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+rm(list = ls()) # clear global environment 
 ```
 
 # Treatment Effect
@@ -37,15 +38,15 @@ C_df=read.csv("Data/Study_C.csv")
 D_df=read.csv("Data/Study_D.csv")
 E_df=read.csv("Data/Study_E.csv")
 
-summary(A_df)
+summary(E_df)
 ```
 
 ```{r combine datasets}
 #remove LeadStatus column
-A_sub = A_df[ , -which(names(A_df) %in% c("LeadStatus"))]
-B_sub = B_df[ , -which(names(B_df) %in% c("LeadStatus"))]
-C_sub = C_df[ , -which(names(C_df) %in% c("LeadStatus"))]
-D_sub = D_df[ , -which(names(D_df) %in% c("LeadStatus"))]
+A_sub = A_df[ , -which(names(A_df) %in% c("LeadStatus","AssessmentiD"))]
+B_sub = B_df[ , -which(names(B_df) %in% c("LeadStatus","AssessmentiD"))]
+C_sub = C_df[ , -which(names(C_df) %in% c("LeadStatus","AssessmentiD"))]
+D_sub = D_df[ , -which(names(D_df) %in% c("LeadStatus","AssessmentiD"))]
 E_sub = E_df # study E does not have the LeadStatus column!
 
 combined_df = rbind(A_sub,B_sub,C_sub,D_sub,E_sub) # combine datasets
@@ -122,7 +123,7 @@ print(p)
 
 ### Total PANSS for a given study 
 ```{r total scores for given study}
-study = A_sub
+study = C_sub
 
 treated = study[which(study$TxGroup == "Treatment"),]
 control = study[which(study$TxGroup == "Control"),]
