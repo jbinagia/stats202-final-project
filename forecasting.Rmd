@@ -1065,10 +1065,30 @@ tuned_mars <- train(
 
 # best model
 tuned_mars$bestTune
-##    nprune degree
-## 14     34      2
+summary(tune_mars)
 
 # plot results
 ggplot(tuned_mars)
 ```
 See http://uc-r.github.io/mars for how to visualize/interpret results further. 
+
+### Visualize
+```{r mars-importance}
+library(vip)       # variable importance
+
+# variable importance plots
+p1 <- vip(tuned_mars, num_features = 40, bar = FALSE, value = "gcv") + ggtitle("GCV")
+p2 <- vip(tuned_mars, num_features = 40, bar = FALSE, value = "rss") + ggtitle("RSS")
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+```{r test-mse}
+test_predict = predict(tuned_mars, test_df)
+mean((test_df$PANSS_Total - test_predict)^2)
+plot(as.vector(test_predict), test_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100)) 
+abline(0,1) 
+
+forecast_df$PANSS_Total = predict(tuned_mars, forecast_df)
+write.csv(forecast_df[,c("PatientID","PANSS_Total")],'mars-forecast.csv',row.names=FALSE)
+```
