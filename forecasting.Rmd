@@ -55,6 +55,7 @@ library(ggplot2)
   
 
 ## Thoughts/Conclusions
+- decision trees are likely ill-suited for this dataset https://stats.stackexchange.com/questions/235189/random-forest-regression-not-predicting-higher-than-training-data
 
 ## Setup
 ```{r Load Data}
@@ -790,10 +791,10 @@ train.h2o <- as.h2o(training_df[,-"PatientID"])
 hyper_grid.h2o <- list(
   ntrees      = seq(300, 550, by = 50), 
   mtries      = 2,
-  max_depth   = seq(20, 40, by = 5), 
-  min_rows    = seq(8, 10, by = 1), 
-  nbins       = seq(5, 30, by = 5), 
-  sample_rate = c(0.5,0.55,.6,.65,.7) 
+  max_depth   = seq(15, 45, by = 5), 
+  min_rows    = seq(7, 11, by = 1), 
+  nbins       = seq(5, 25, by = 5), 
+  sample_rate = c(0.4,0.45,0.5,0.55,.6,.65,.7) 
 )
 
 # random grid search criteria
@@ -860,7 +861,7 @@ best_model_perf <- h2o.performance(model = best_model, newdata = test_df.h2o)
 
 # View prediction 
 prediction = predict(best_model, test_df.h2o) 
-plot(as.vector(prediction), test_df$PANSS_Total)
+plot(as.vector(prediction), test_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100))
 abline(0,1) # line with y-intercept 0 and slope 1 
 
 # RMSE of best model
