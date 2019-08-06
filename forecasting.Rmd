@@ -880,133 +880,195 @@ While we could scale some variables, scaling does not matter for decision trees!
 
 ## Linear models
 ```{r adjust-dataframes}
-training_df = subset(training_df, select = c(PatientID, TxGroup, VisitDay, Study,PANSS_Total))
-test_df = subset(test_df, select = c(PatientID, TxGroup, VisitDay, Study,PANSS_Total))
+#training_df = subset(training_df, select = c(PatientID, TxGroup, VisitDay, Study,PANSS_Total))
+#test_df = subset(test_df, select = c(PatientID, TxGroup, VisitDay, Study,PANSS_Total))
 ```
 
-### Linear regression
-Fit a linear model using least squares on the training set, and report the test error obtained.
-```{r linear}
-linear.mod = lm(PANSS_Total ~., data=training_df)
-summary(linear.mod)
+<!-- ### Linear regression -->
+<!-- Fit a linear model using least squares on the training set, and report the test error obtained. -->
+<!-- ```{r linear} -->
+<!-- linear.mod = lm(PANSS_Total ~., data=training_df) -->
+<!-- summary(linear.mod) -->
 
-# Calculate test MSE
-mean((test_df$PANSS_Total - predict(linear.mod, test_df))^2)
+<!-- # Calculate test MSE -->
+<!-- mean((test_df$PANSS_Total - predict(linear.mod, test_df))^2) -->
+<!-- ``` -->
+
+<!-- ### Ridge regression -->
+<!-- Fit a ridge regression model on the training set, with λ chosen by cross-validation. Report the test error obtained. -->
+<!-- ```{r ridge} -->
+<!-- library(glmnet) -->
+<!-- set.seed(1) -->
+
+<!-- # Create design matrices -->
+<!-- train.mat = model.matrix(PANSS_Total ~ .-PatientID, data = training_df) -->
+<!-- test.mat = model.matrix(PANSS_Total ~ .-PatientID, data = test_df) -->
+<!-- # adding exp(-VisitDay) didn't seem to help much -->
+
+<!-- # Ridge regression for array of lambda values -->
+<!-- #grid=10^seq(10,-3,length=100) -->
+<!-- #ridge.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=0,lambda=grid, thresh=1e-12) -->
+<!-- ridge.mod=glmnet(x = train.mat, y = training_df$PANSS_Total, alpha=0) -->
+<!-- plot(ridge.mod, xvar = "lambda") -->
+
+<!-- # Find lambda through cross-validation -->
+<!-- cv.out = cv.glmnet(train.mat, training_df$PANSS_Total, alpha = 0) -->
+<!-- ridge.cv.out = cv.out  -->
+<!-- plot(cv.out) -->
+<!-- bestlam = cv.out$lambda.min -->
+<!-- bestlam -->
+
+<!-- # Calculate test MSE -->
+<!-- ridge.pred=predict(ridge.mod,s=bestlam,newx=test.mat) -->
+<!-- mean((ridge.pred - test_df$PANSS_Total)^2) -->
+<!-- ``` -->
+<!-- Note that the first and second vertical dashed lines represent the λ value with the minimum MSE and the largest λ value within one standard error of the minimum MSE. -->
+
+<!-- ```{r ridge-lambda} -->
+<!-- min(cv.out$cvm)       # minimum MSE -->
+<!-- cv.out$lambda.min     # lambda for this min MSE -->
+
+<!-- cv.out$cvm[cv.out$lambda == cv.out$lambda.1se]  # 1 st.error of min MSE -->
+<!-- cv.out$lambda.1se  # lambda for this MSE -->
+
+<!-- # visualize how much we can restrain coefficients while still having predictive accuracy  -->
+<!-- ridge_min <- glmnet(x = train.mat, y = training_df$PANSS_Total, alpha=0) -->
+<!-- plot(ridge_min, xvar = "lambda") -->
+<!-- abline(v = log(cv.out$lambda.1se), col = "red", lty = "dashed") -->
+
+<!-- library(broom) -->
+<!-- coef(cv.out, s = "lambda.1se") %>% -->
+<!--   tidy() %>% -->
+<!--   filter(row != "(Intercept)") %>% -->
+<!--   top_n(25, wt = abs(value)) %>% -->
+<!--   ggplot(aes(value, reorder(row, value))) + -->
+<!--   geom_point() + -->
+<!--   ggtitle("Top 25 influential variables") + -->
+<!--   xlab("Coefficient") + -->
+<!--   ylab(NULL) -->
+<!-- ``` -->
+
+<!-- ### Lasso regression -->
+<!-- Fit a lasso model on the training set, with λ chosen by crossvalidation -->
+<!-- ```{r lasso} -->
+<!-- library(glmnet) -->
+<!-- set.seed(1) -->
+
+<!-- # Lasso regression for array of lambda values -->
+<!-- #grid=10^seq(10,-3,length=100) -->
+<!-- #lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1,lambda=grid, thresh=1e-12) -->
+<!-- lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1) -->
+<!-- plot(lasso.mod, xvar = "lambda") -->
+
+<!-- # Find lambda through cross-validation -->
+<!-- cv.out=cv.glmnet(train.mat, training_df$PANSS_Total,alpha=1) -->
+<!-- lasso.cv.out = cv.out  -->
+<!-- plot(cv.out) -->
+<!-- bestlam=cv.out$lambda.min -->
+<!-- bestlam -->
+
+<!-- # Calculate test MSE -->
+<!-- lasso.pred=predict(lasso.mod,s=bestlam,newx=test.mat) -->
+<!-- mean((lasso.pred-test_df$PANSS_Total)^2) -->
+
+<!-- predict(cv.out, s = bestlam, type = "coefficients") -->
+<!-- ``` -->
+
+<!-- ```{r lasso-error} -->
+<!-- min(cv.out$cvm)       # minimum MSE -->
+<!-- cv.out$lambda.min     # lambda for this min MSE -->
+
+<!-- cv.out$cvm[cv.out$lambda == cv.out$lambda.1se]  # 1 st.error of min MSE -->
+<!-- cv.out$lambda.1se  # lambda for this MSE -->
+
+<!-- # visualize lasso results -->
+<!-- lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1) -->
+<!-- plot(lasso.mod, xvar = "lambda") -->
+<!-- abline(v = log(cv.out$lambda.min), col = "red", lty = "dashed") -->
+<!-- abline(v = log(cv.out$lambda.1se), col = "red", lty = "dashed") -->
+
+<!-- # most influential variables -->
+<!-- coef(cv.out, s = "lambda.1se") %>% -->
+<!--   tidy() %>% -->
+<!--   filter(row != "(Intercept)") %>% -->
+<!--   ggplot(aes(value, reorder(row, value), color = value > 0)) + -->
+<!--   geom_point(show.legend = FALSE) + -->
+<!--   ggtitle("Influential variables") + -->
+<!--   xlab("Coefficient") + -->
+<!--   ylab(NULL) -->
+<!-- ``` -->
+
+<!-- ```{r ridge-vs-lasso-error} -->
+<!-- # minimum Ridge MSE -->
+<!-- min(ridge.cv.out$cvm) -->
+<!-- plot(ridge.pred,test_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100)) -->
+
+<!-- # minimum Lasso MSE -->
+<!-- min(lasso.cv.out$cvm) -->
+<!-- plot(lasso.pred,test_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100)) -->
+<!-- ``` -->
+
+## Multivariate Adaptive Regression Spline (MARS)
+```{r basic-mars}
+library(earth)     # fit MARS models
+
+# Fit a basic MARS model
+mars1 <- earth(
+  PANSS_Total ~ .,  
+  data = training_df[,-"PatientID"]
+)
+
+# Print model summary
+print(mars1)
+summary(mars1) %>% .$coefficients %>% head(10)
+plot(mars1, which = 1)
 ```
 
-### Ridge regression
-Fit a ridge regression model on the training set, with λ chosen by cross-validation. Report the test error obtained.
-```{r ridge}
-library(glmnet)
+```{r mars-interactions}
+# Fit a basic MARS model
+mars2 <- earth(
+  PANSS_Total ~ .,  
+  data = training_df[,-"PatientID"],
+  degree = 3
+)
+
+# check out the first 10 coefficient terms
+print(mars2)
+summary(mars2) %>% .$coefficients %>% head(10)
+plot(mars2, which = 1)
+```
+
+### Tuning
+```{r mars-grid}
+# create a tuning grid
+hyper_grid <- expand.grid(
+  degree = 1:3, 
+  nprune = seq(1, 16, by = 2)
+  )
+
+head(hyper_grid)
+```
+
+```{r mars-tune}
+library(caret)
 set.seed(1)
 
-# Create design matrices
-train.mat = model.matrix(PANSS_Total ~ .-PatientID, data = training_df)
-test.mat = model.matrix(PANSS_Total ~ .-PatientID, data = test_df)
-# adding exp(-VisitDay) didn't seem to help much
+# cross validated model
+tuned_mars <- train(
+  x = subset(training_df[,-"PatientID"], select = -PANSS_Total),
+  y = training_df$PANSS_Total,
+  method = "earth",
+  metric = "RMSE",
+  trControl = trainControl(method = "cv", number = 10),
+  tuneGrid = hyper_grid
+)
 
-# Ridge regression for array of lambda values
-#grid=10^seq(10,-3,length=100)
-#ridge.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=0,lambda=grid, thresh=1e-12)
-ridge.mod=glmnet(x = train.mat, y = training_df$PANSS_Total, alpha=0)
-plot(ridge.mod, xvar = "lambda")
+# best model
+tuned_mars$bestTune
+##    nprune degree
+## 14     34      2
 
-# Find lambda through cross-validation
-cv.out = cv.glmnet(train.mat, training_df$PANSS_Total, alpha = 0)
-ridge.cv.out = cv.out 
-plot(cv.out)
-bestlam = cv.out$lambda.min
-bestlam
-
-# Calculate test MSE
-ridge.pred=predict(ridge.mod,s=bestlam,newx=test.mat)
-mean((ridge.pred - test_df$PANSS_Total)^2)
+# plot results
+ggplot(tuned_mars)
 ```
-Note that the first and second vertical dashed lines represent the λ value with the minimum MSE and the largest λ value within one standard error of the minimum MSE.
-
-```{r ridge-lambda}
-min(cv.out$cvm)       # minimum MSE
-cv.out$lambda.min     # lambda for this min MSE
-
-cv.out$cvm[cv.out$lambda == cv.out$lambda.1se]  # 1 st.error of min MSE
-cv.out$lambda.1se  # lambda for this MSE
-
-# visualize how much we can restrain coefficients while still having predictive accuracy 
-ridge_min <- glmnet(x = train.mat, y = training_df$PANSS_Total, alpha=0)
-plot(ridge_min, xvar = "lambda")
-abline(v = log(cv.out$lambda.1se), col = "red", lty = "dashed")
-
-library(broom)
-coef(cv.out, s = "lambda.1se") %>%
-  tidy() %>%
-  filter(row != "(Intercept)") %>%
-  top_n(25, wt = abs(value)) %>%
-  ggplot(aes(value, reorder(row, value))) +
-  geom_point() +
-  ggtitle("Top 25 influential variables") +
-  xlab("Coefficient") +
-  ylab(NULL)
-```
-
-### Lasso regression
-Fit a lasso model on the training set, with λ chosen by crossvalidation
-```{r lasso}
-library(glmnet)
-set.seed(1)
-
-# Lasso regression for array of lambda values
-#grid=10^seq(10,-3,length=100)
-#lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1,lambda=grid, thresh=1e-12)
-lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1)
-plot(lasso.mod, xvar = "lambda")
-
-# Find lambda through cross-validation
-cv.out=cv.glmnet(train.mat, training_df$PANSS_Total,alpha=1)
-lasso.cv.out = cv.out 
-plot(cv.out)
-bestlam=cv.out$lambda.min
-bestlam
-
-# Calculate test MSE
-lasso.pred=predict(lasso.mod,s=bestlam,newx=test.mat)
-mean((lasso.pred-test_df$PANSS_Total)^2)
-
-predict(cv.out, s = bestlam, type = "coefficients")
-```
-
-```{r lasso-error}
-min(cv.out$cvm)       # minimum MSE
-cv.out$lambda.min     # lambda for this min MSE
-
-cv.out$cvm[cv.out$lambda == cv.out$lambda.1se]  # 1 st.error of min MSE
-cv.out$lambda.1se  # lambda for this MSE
-
-# visualize lasso results
-lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1)
-plot(lasso.mod, xvar = "lambda")
-abline(v = log(cv.out$lambda.min), col = "red", lty = "dashed")
-abline(v = log(cv.out$lambda.1se), col = "red", lty = "dashed")
-
-# most influential variables
-coef(cv.out, s = "lambda.1se") %>%
-  tidy() %>%
-  filter(row != "(Intercept)") %>%
-  ggplot(aes(value, reorder(row, value), color = value > 0)) +
-  geom_point(show.legend = FALSE) +
-  ggtitle("Influential variables") +
-  xlab("Coefficient") +
-  ylab(NULL)
-```
-
-```{r ridge-vs-lasso-error}
-# minimum Ridge MSE
-min(ridge.cv.out$cvm)
-plot(ridge.pred,test_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100))
-
-# minimum Lasso MSE
-min(lasso.cv.out$cvm)
-plot(lasso.pred,test_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100))
-```
-
-
-
+See http://uc-r.github.io/mars for how to visualize/interpret results further. 
