@@ -188,17 +188,41 @@ write.csv(test.output,"test.nb.csv",row.names=FALSE)
 
 ```
 
-The naive classifier doesn't do great on our holdout test data. The total accuracy is $0.86$ but the false and true positive rates are high. 
+The naive classifier doesn't do great on our holdout test data. The total development AUC is $0.77$ but the false and true positive rates are high. 
 
-We might try a logistic regression. In this case, we exclude the ID numbers (since they are categorical data that does not make sense to regress on).
+We might try a logistic regression. However, Study E has no country of UK, so we take out the country as a predictor. 
 
 ```{r logistic}
-combined.train.glm=subset(combined.train,select=c("Country","TxGroup","VisitDay","Study" ,"PANSS_Total","LeadStatus" ))
+library(pROC)
+names(combined.train)
+combined.train.glm=combined.train[,-1]#take out country
 attach(combined.train.glm)
+names(combined.train.glm)
 train.glm=glm(LeadStatus~.,data=combined.train.glm,family=binomial)
 summary(train.glm)
-contrasts(LeadStatus)
+contrasts(LeadStatus)#check dummy encoding for Up/Down
+
+#dev test
+glm.probs.flag.dev=1-predict(train.glm,combined.dev,type="response")
+glm.pred=rep("Passed",dim(combined.dev)[1])#create vector of predictions of length the same as dev dataset
+glm.pred[glm.probs.flag.dev>0.2]="Flagged"#change relevant values to "Flagged" based on model-predicted value.
+table(glm.pred,combined.dev$LeadStatus)
+roc.dev=roc(LeadStatus~glm.probs.flag.dev,data=combined.dev)
+plot(roc.dev,xlim=c(0,1),ylim=c(0,1))
+#kaggle test
+test=E_df
+glm.probs=predict(train.glm,test,type="response")#compute predictions based on fit for each observation; 1 corresponds to Passed
+glm.probs.flag=1-glm.probs#probabililty of being flagged for all.
+names(test)
+test.output.glm=as.data.frame(test$AssessmentiD)
+test.output.glm$LeadStatus=glm.probs.flag
+colnames(test.output.glm)[colnames(test.output.glm)=="AssessmentiD"] <- "AssessmentID"
+write.csv(test.output.glm,"test.glm.csv",row.names=FALSE)
+
 ```
 It looks like PANSS_Total, VisitDay, Study, TxGroup, and some countries are statistically significant predictors of Passed vs Flagged. 
 
-
+```{r similarity}
+plot(test.output.glm$LeadStatus,nb.predictions_df$Flagged,xlim=c(0,0.5),ylim=c(0,0.5))
+abline(0,1)
+```
