@@ -156,6 +156,8 @@ combined.dev.h2o=combined.dev %>%
 performance.train=h2o.performance(train.nb,xval=TRUE)
 performance.dev=h2o.performance(train.nb,newdata=combined.dev.h2o)
 
+logloss.train = h2o.logloss(performance.train,xval=TRUE)
+logloss.dev=h2o.logloss(performance.dev,xval=TRUE)
 auc.train <- h2o.auc(performance.train,xval=TRUE)
 auc.dev <- h2o.auc(performance.dev)
 fpr.dev <- h2o.fpr(performance.dev) %>% .[['fpr']]
@@ -163,7 +165,7 @@ tpr.dev <- h2o.tpr(performance.dev) %>% .[['tpr']]
 data.frame(fpr = fpr.dev, tpr = tpr.dev) %>%
   ggplot(aes(fpr, tpr) ) +
   geom_line() + 
-  ggtitle( sprintf('Development Dataset AUC: %f', auc.dev) )
+  ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 
 
 ```
