@@ -12,6 +12,8 @@ rm(list = ls()) # clear global environment
 library(h2o)          # a java-based platform
 library(plyr)
 library(ggplot2)
+library(ggrepel)
+library(RColorBrewer)
 ```
 
 ## Notes/Assumptions
@@ -222,9 +224,83 @@ Note that as a baseline we use the most recent `PANSS_Total` score as a baseline
 write.csv(select_patients_df[,c("PatientID","PANSS_Total")],'naive-forecast.csv',row.names=FALSE)
 ```
 
-```{r total scores for given study}
+How can we improve upon this simple model? First let's examine the distribution of scores in study E vs. the other studies. 
+```{r histogram-scores-in-study-e}
+hist(combined_df$PANSS_Total)
 hist(E_df$PANSS_Total)
 hist(select_patients_df$PANSS_Total)
+```
+
+We can also visualize the scores over time. 
+```{r scores-over-time}
+selected_patients = subset(E_df, PatientID %in% prediction.patients)
+remaining_study_e = subset(E_df, !(PatientID %in% prediction.patients))
+
+p = ggplot(NULL,aes())+
+  geom_jitter(data=selected_patients,aes(x=VisitDay,y=PANSS_Total,col="Selected Patients"),size=0.5)+
+  geom_jitter(data=remaining_study_e,aes(x=VisitDay,y=PANSS_Total,col="Rest of Study E"),size=0.5)+
+  geom_jitter(data=select_patients_df,aes(x=VisitDay,y=PANSS_Total,col="Final Day"),size=0.5)+
+  scale_color_manual(values=rev(pal_aaas("default")(3)))+
+  theme_minimal()+
+  theme(legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
+print(p)
+```
+We can now see why the naive prediction works so well. At this point in the study, these patients scores have virtually stopped changing with respect to time. Thus, an "alright" prediction for their next visit is simply what they scored on their most recent visit. 
+
+To remove some variance from this naive prediction, we can take the simple average of these last two visit scores:
+```{r average-last-two-scores}
+#naive_df = subset(E_df, PatientID %in% prediction.patients, select = c("PatientID","VisitDay","PANSS_Total")) # start with study E
+#dim(naive_df)[1]
+
+#naive_df = distinct(naive_df) # remove duplicates
+#dim(naive_df)[1]
+
+naive_df = subset(dev_df, select = c("PatientID","VisitDay","PANSS_Total")) # start with dev set
+names(naive_df)[2] = "LastVisitDay" # rename column
+names(naive_df)[3] = "FinalScore" # rename column
+
+# find second to last visit day 
+for (id in naive_df$PatientID) { # for each unique id
+  sub_df = subset(E_df, PatientID==id)
+  x = sub_df$VisitDay
+  n <- length(x)
+  if (n==1) {
+    naive_df[naive_df$PatientID == id,"SecondToLastDay"] = NA
+  }else{
+    naive_df[naive_df$PatientID == id,"SecondToLastDay"] = sort(x,partial=n-1)[n-1]
+  }
+}
+
+# find second to last score 
+naive_df$SecondToLastScore = as.numeric(naive_df$FinalScore)
+for (id in naive_df$PatientID) { # for each unique id
+  day = as.integer(naive_df[naive_df$PatientID == id,"SecondToLastDay"])
+  if (is.na(day)){
+    naive_df[naive_df$PatientID == id,"SecondToLastScore"] = NA
+  }else{
+    sub_df = subset(E_df, PatientID==id & VisitDay==day)
+    if (dim(sub_df)[1] > 1){ # take simple average in this case
+      naive_df[naive_df$PatientID == id,"SecondToLastScore"] = mean(sub_df$PANSS_Total)
+    }else{
+      naive_df[naive_df$PatientID == id,"SecondToLastScore"] = sub_df$PANSS_Total
+    }
+  }
+}
+
+# average final two scores
+naive_df$FinalScore = as.numeric(naive_df$FinalScore)
+naive_df$PANSS_Total = as.numeric(naive_df$FinalScore)
+for (id in naive_df$PatientID) { # for each unique id
+  day = as.integer(naive_df[naive_df$PatientID == id,"SecondToLastDay"])
+  if (is.na(day)){
+    naive_df[naive_df$PatientID == id,"PANSS_Total"] = naive_df[naive_df$PatientID == id,"FinalScore"]
+  }else{
+    naive_df[naive_df$PatientID == id,"PANSS_Total"] = mean(c(as.integer(naive_df[naive_df$PatientID == id,"FinalScore"]),as.integer(naive_df[naive_df$PatientID == id,"SecondToLastScore"])))
+  }
+}
+
+# create submission script
+write.csv(naive_df[,c("PatientID","PANSS_Total")],'less-naive-forecast.csv',row.names=FALSE)
 ```
 
 ### Create training set
