@@ -23,16 +23,16 @@ library(ggplot2)
   - typically data in class ranges over time OR over individual. Here we have both. 
   - we can't average over individuals because we need distinct predictions for each individual given. 
   - we can't average over time because visitDay is likely a decently strong predictor for the level. 
-- gradient descent reference http://uc-r.github.io/gbm_regression
+- gradient boosting reference http://uc-r.github.io/gbm_regression
 - no need to standardize data if using decision trees!
   
 ### Model 
   - clearly PANSS total is the response 
   - likely predictors include
-    - (maybe) study 
     - Country 
     - TxGroup
     - VisitDay
+    - Study 
   - we will keep PatientID in our dataframe as a "key" for each row/patient. 
   - exclude
     - individual scores (if you had these, you could simply sum them to get the total score)
@@ -43,9 +43,8 @@ library(ggplot2)
 
 ### Splitting the data 
   - Following the suggested methodology found in slide 14 of the lecture 5 slides, we will split the data as follows:
-    - test set: The 17th-week for the 379 patients in study E (where we define "17th-week" as our last recorded measurement from them). We will use the test set to choose between different models.  
-    - prediction set: Take the test set and add 7 days to `VisitDay` as a proxy for "18th-week" visit. 
-    - training/development set: the total aggregate of all of the studies minus the observations in the test set (note that we do not choose to set aside a validation/development set since ultimately we will use k-fold cross-validation for tuning hyper-parameters).   
+    - test set: The 18th-week for the 379 patients in study E (where we define "18th-week" as the final visit for them). This is what Kaggle uses to evaluate the competitors. 
+    - training set: the total aggregate of all of the observations in studies A-E minus the training set (note that we do not choose to set aside a validation/development set since ultimately we will use k-fold cross-validation for tuning hyper-parameters).   
     - issues:
       - study E seems to be distinct in the segmentation plots from the other studies... could be a bias in that there is much more data from the other studies in our training set. 
   - following suggests combining studies A-D since they are essentially the same https://groups.google.com/forum/#!searchin/stats202/validation%7Csort:date/stats202/ULXRN3seaBE/5DFG-1LmEgAJs
@@ -129,13 +128,13 @@ How many visits did each patient have?
 
 
 ## Data Cleaning
-Remove columns not corresponding to our predictors and response (total PANSS score)
+Remove columns not corresponding to our predictors and response (total PANSS score).
 ```{r subset-df}
-A_df = subset(A_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
-B_df = subset(B_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
-C_df = subset(C_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
-D_df = subset(D_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
-E_df = subset(E_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
+A_df = subset(A_df, select = c(PatientID, Country, TxGroup, Study, VisitDay,PANSS_Total))
+B_df = subset(B_df, select = c(PatientID, Country, TxGroup, Study, VisitDay,PANSS_Total))
+C_df = subset(C_df, select = c(PatientID, Country, TxGroup, Study, VisitDay,PANSS_Total))
+D_df = subset(D_df, select = c(PatientID, Country, TxGroup, Study, VisitDay,PANSS_Total))
+E_df = subset(E_df, select = c(PatientID, Country, TxGroup, Study, VisitDay,PANSS_Total))
 # A_df = subset(A_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
 # B_df = subset(B_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
 # C_df = subset(C_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
@@ -165,14 +164,14 @@ for (i in 1:dim(combined_df)[1]) {
 ### Create test set 
 Set aside the test set, i.e. the patient's whose score we will predict on Kaggle. 
 ```{r test-set}
-#test_df = combined_df[VisitDay==FinalDay & (PatientID %in% prediction.patients)  , ]
-test_df = subset(combined_df, VisitDay==FinalDay & PatientID %in% prediction.patients)
-dim(test_df)[1] 
+#select_patients_df = combined_df[VisitDay==FinalDay & (PatientID %in% prediction.patients)  , ]
+select_patients_df = subset(combined_df, VisitDay==FinalDay & PatientID %in% prediction.patients)
+dim(select_patients_df)[1] 
 ```
 Note that this subsetting does not produce 379 as expected. What is going on here? 
 ```{r explore-test-set}
-for (id in unique(test_df$PatientID)) { # for each unique id
-  sub_df = subset(test_df, PatientID==id)
+for (id in unique(select_patients_df$PatientID)) { # for each unique id
+  sub_df = subset(select_patients_df, PatientID==id)
   if (dim(sub_df)[1]>1){
     print(sub_df)
   }
@@ -181,7 +180,7 @@ for (id in unique(test_df$PatientID)) { # for each unique id
 We see that multiple patients were assessed multiple times on the final day (perhaps by different people, at different locations). We can remove such duplicates with the `distinct()` function.
 ```{r remove-duplicates}
 library(dplyr)
-test_df = distinct(test_df)
+test_df = distinct(select_patients_df)
 dim(test_df)[1]
 ```
 This still doesn't yield a dataset of size 379 since there are PANSS_Total scores that differ! Thus, there must be patients who were assessed multiple times in the same day by the same person and at the same location (for example, PatientID 50505). 
@@ -196,10 +195,10 @@ test_df
 ```
 We see that in each of these cases the difference in PANSS_Total is a few points (except PatientID 50299). Simplest solution is to average over these values: 
 ```{r simple-average}
-pre_test_df = test_df # save what we have so far ... we will exclude this from the total data 
+#pre_select_patients_df = select_patients_df # save what we have so far ... we will exclude this from the total data 
 
 library(data.table)
-keys <- colnames(test_df)[!grepl('PANSS_Total',colnames(test_df))] # all column names except for PANSS_Total
+keys <- colnames(select_patients_df)[!grepl('PANSS_Total',colnames(test_df))] # all column names except for PANSS_Total
 X <- as.data.table(test_df)
 test_df = X[,list(mm=mean(PANSS_Total)),keys]
 names(test_df)[length(names(test_df))] = "PANSS_Total"
@@ -207,32 +206,24 @@ dim(test_df)
 ```
 Which returns the desired number of 379 rows. 
 
-Finally, we would like our actually forecasting set to best reflect the "18-th week" visit. To do so, we imagine each patient going back for assessment one week after whenever their final week was. So we add a value of 7 days to their `VisitDay`. We also drop the `FinalDay` column at this point. Also potentially scale the data here. 
+Finally, we would like our actually test set to best reflect the "18-th week" visit. To do so, we imagine each patient going back for assessment one week after whenever their final week was. So we add a value of 7 days to their `VisitDay`. We also drop the `FinalDay` column at this point. Also potentially scale the data here depending on the subsequent methods used. 
 ```{r create-test-set}
-test_df = subset(test_df, select = c(PatientID, Country, TxGroup, VisitDay, Study,PANSS_Total))
-#test_df = subset(test_df, select = c(PatientID, Country, VisitDay, Study,PANSS_Total))
-
-forecast_df = test_df
-forecast_df = subset(forecast_df, select = c(PatientID, Country, TxGroup, VisitDay, Study))
-#forecast_df = subset(forecast_df, select = c(PatientID, Country, VisitDay, Study))
-forecast_df$VisitDay = forecast_df$VisitDay + 7 
-#test_df$VisitDay = scale(test_df$VisitDay)
-#test_df$PANSS_Total = scale(test_df$PANSS_Total)
+test_df = subset(test_df, select = c(PatientID, Country, TxGroup, VisitDay, Study))
+test_df$VisitDay = test_df$VisitDay + 7 
+#select_patients_df$VisitDay = scale(select_patients_df$VisitDay)
+#select_patients_df$PANSS_Total = scale(select_patients_df$PANSS_Total)
 
 # create "Naive" submission 
-write.csv(test_df[,c("PatientID","PANSS_Total")],'naive-forecast.csv',row.names=FALSE)
+write.csv(select_patients_df[,c("PatientID","PANSS_Total")],'naive-forecast.csv',row.names=FALSE)
 ```
 
 ### Create training set
 ```{r remove-test-from-total}
 dim(combined_df)
-combined_df = anti_join(combined_df, test_df)
+combined_df = anti_join(combined_df, select_patients_df)
 dim(combined_df)
 ```
 This removes 410 elements as expected. We should also remove any duplicates from here as we did for the test set. 
-
-"Note that we ended up not removing these 410 observations since I considered them distinct from the test set (the test set has VisitDay shifted upwards by a value of 7).": -> we should remove these, and not do the + 7 for the test set. You did remove them above. 
-
 
 ```{r remove-training-dups}
 training_df = distinct(combined_df)
@@ -251,9 +242,9 @@ training_df = subset(training_df, select = c(PatientID, Country, TxGroup, VisitD
 
 While we could scale some variables, scaling does not matter for decision trees! 
 ```{r training-scale}
-#test_df$PatientID = scale(test_df$PatientID)
-#test_df$VisitDay = scale(test_df$VisitDay)
-#test_df$PANSS_Total = scale(test_df$PANSS_Total)
+#select_patients_df$PatientID = scale(select_patients_df$PatientID)
+#select_patients_df$VisitDay = scale(select_patients_df$VisitDay)
+#select_patients_df$PANSS_Total = scale(select_patients_df$PANSS_Total)
 ```
 
 ## Gradient Boosting (gbm)
@@ -379,10 +370,10 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- ### Prediction -->
 <!-- ```{r gbm-prediction} -->
 <!-- # predict values for test data -->
-<!-- pred <- predict(gbm.fit.final, n.trees = gbm.fit.final$n.trees, test_df) -->
+<!-- pred <- predict(gbm.fit.final, n.trees = gbm.fit.final$n.trees, select_patients_df) -->
 
 <!-- # results -->
-<!-- caret::RMSE(pred, test_df$PANSS_Total) -->
+<!-- caret::RMSE(pred, select_patients_df$PANSS_Total) -->
 
 <!-- # write to csv for Kaggle submission -->
 <!-- write.csv(pred,'healthstudy2.csv') -->
@@ -408,8 +399,8 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- response_train <- training_df$PANSS_Total -->
 
 <!-- # Prepare the test data -->
-<!-- features_test <- vtreat::prepare(treatplan, test_df, varRestriction = new_vars) %>% as.matrix() -->
-<!-- response_test <- test_df$PANSS_Total -->
+<!-- features_test <- vtreat::prepare(treatplan, select_patients_df, varRestriction = new_vars) %>% as.matrix() -->
+<!-- response_test <- select_patients_df$PANSS_Total -->
 
 <!-- # dimensions of one-hot encoded data -->
 <!-- dim(features_train) -->
@@ -529,7 +520,7 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- ### Prediciton -->
 <!-- ```{r xgboost-prediction} -->
 <!-- # predict values for test data -->
-<!-- pred <- predict(xgb.fit.final, test_df) -->
+<!-- pred <- predict(xgb.fit.final, select_patients_df) -->
 
 <!-- # results -->
 <!-- caret::RMSE(pred, response_test) -->
@@ -700,7 +691,7 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- ### Prediction -->
 <!-- ```{r h20-prediction} -->
 <!-- # convert test set to h2o object -->
-<!-- test.h2o <- as.h2o(test_df) -->
+<!-- test.h2o <- as.h2o(select_patients_df) -->
 
 <!-- # evaluate performance on new data -->
 <!-- h2o.performance(model = h2o.final, newdata = test.h2o) -->
@@ -710,7 +701,7 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- test.h2o$prediction = predict(h2o.final, test.h2o) # gives same result as above -->
 
 <!-- # write to csv for Kaggle submission -->
-<!-- forecast.h2o <- as.h2o(forecast_df) -->
+<!-- forecast.h2o <- as.h2o(test_df) -->
 <!-- forecast.h2o$PANSS_Total = predict(h2o.final, forecast.h2o)  -->
 <!-- h2o.exportFile(forecast.h2o[,c("PatientID","PANSS_Total")],'h2o-prediction.csv',force=TRUE) -->
 <!-- ``` -->
@@ -864,19 +855,19 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- h2o.varimp_plot(best_model) -->
 
 <!-- # Now let’s evaluate the model performance on a test set -->
-<!-- test_df.h2o <- as.h2o(test_df) -->
-<!-- best_model_perf <- h2o.performance(model = best_model, newdata = test_df.h2o) -->
+<!-- select_patients_df.h2o <- as.h2o(select_patients_df) -->
+<!-- best_model_perf <- h2o.performance(model = best_model, newdata = select_patients_df.h2o) -->
 
 <!-- # View prediction  -->
-<!-- prediction = predict(best_model, test_df.h2o)  -->
-<!-- plot(as.vector(prediction), test_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100)) -->
+<!-- prediction = predict(best_model, select_patients_df.h2o)  -->
+<!-- plot(as.vector(prediction), select_patients_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100)) -->
 <!-- abline(0,1) # line with y-intercept 0 and slope 1  -->
 
 <!-- # RMSE of best model -->
 <!-- h2o.mse(best_model_perf) -->
 
 <!-- # write to csv for Kaggle submission -->
-<!-- forecast.h2o <- as.h2o(forecast_df) -->
+<!-- forecast.h2o <- as.h2o(test_df) -->
 <!-- forecast.h2o$PANSS_Total = predict(best_model, forecast.h2o) -->
 <!-- h2o.exportFile(forecast.h2o[,c("PatientID","PANSS_Total")],'rf-prediction.csv',force=TRUE) -->
 <!-- ``` -->
@@ -886,7 +877,7 @@ While we could scale some variables, scaling does not matter for decision trees!
 ## Linear models
 ```{r adjust-dataframes}
 #training_df = subset(training_df, select = c(PatientID, TxGroup, VisitDay, Study,PANSS_Total))
-#test_df = subset(test_df, select = c(PatientID, TxGroup, VisitDay, Study,PANSS_Total))
+#select_patients_df = subset(select_patients_df, select = c(PatientID, TxGroup, VisitDay, Study,PANSS_Total))
 ```
 
 <!-- ### Linear regression -->
@@ -896,7 +887,7 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- summary(linear.mod) -->
 
 <!-- # Calculate test MSE -->
-<!-- mean((test_df$PANSS_Total - predict(linear.mod, test_df))^2) -->
+<!-- mean((select_patients_df$PANSS_Total - predict(linear.mod, select_patients_df))^2) -->
 <!-- ``` -->
 
 <!-- ### Ridge regression -->
@@ -907,7 +898,7 @@ While we could scale some variables, scaling does not matter for decision trees!
 
 <!-- # Create design matrices -->
 <!-- train.mat = model.matrix(PANSS_Total ~ .-PatientID, data = training_df) -->
-<!-- test.mat = model.matrix(PANSS_Total ~ .-PatientID, data = test_df) -->
+<!-- test.mat = model.matrix(PANSS_Total ~ .-PatientID, data = select_patients_df) -->
 <!-- # adding exp(-VisitDay) didn't seem to help much -->
 
 <!-- # Ridge regression for array of lambda values -->
@@ -925,7 +916,7 @@ While we could scale some variables, scaling does not matter for decision trees!
 
 <!-- # Calculate test MSE -->
 <!-- ridge.pred=predict(ridge.mod,s=bestlam,newx=test.mat) -->
-<!-- mean((ridge.pred - test_df$PANSS_Total)^2) -->
+<!-- mean((ridge.pred - select_patients_df$PANSS_Total)^2) -->
 <!-- ``` -->
 <!-- Note that the first and second vertical dashed lines represent the λ value with the minimum MSE and the largest λ value within one standard error of the minimum MSE. -->
 
@@ -974,7 +965,7 @@ While we could scale some variables, scaling does not matter for decision trees!
 
 <!-- # Calculate test MSE -->
 <!-- lasso.pred=predict(lasso.mod,s=bestlam,newx=test.mat) -->
-<!-- mean((lasso.pred-test_df$PANSS_Total)^2) -->
+<!-- mean((lasso.pred-select_patients_df$PANSS_Total)^2) -->
 
 <!-- predict(cv.out, s = bestlam, type = "coefficients") -->
 <!-- ``` -->
@@ -1006,11 +997,11 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- ```{r ridge-vs-lasso-error} -->
 <!-- # minimum Ridge MSE -->
 <!-- min(ridge.cv.out$cvm) -->
-<!-- plot(ridge.pred,test_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100)) -->
+<!-- plot(ridge.pred,select_patients_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100)) -->
 
 <!-- # minimum Lasso MSE -->
 <!-- min(lasso.cv.out$cvm) -->
-<!-- plot(lasso.pred,test_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100)) -->
+<!-- plot(lasso.pred,select_patients_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100)) -->
 <!-- ``` -->
 
 ## Multivariate Adaptive Regression Spline (MARS)
@@ -1070,7 +1061,7 @@ tuned_mars <- train(
 
 # best model
 tuned_mars$bestTune
-summary(tune_mars)
+summary(tuned_mars)
 
 # plot results
 ggplot(tuned_mars)
@@ -1089,11 +1080,11 @@ gridExtra::grid.arrange(p1, p2, ncol = 2)
 ```
 
 ```{r test-mse}
-test_predict = predict(tuned_mars, test_df)
-mean((test_df$PANSS_Total - test_predict)^2)
-plot(as.vector(test_predict), test_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100)) 
+test_predict = predict(tuned_mars, select_patients_df)
+mean((select_patients_df$PANSS_Total - test_predict)^2)
+plot(as.vector(test_predict), select_patients_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100)) 
 abline(0,1) 
 
-forecast_df$PANSS_Total = predict(tuned_mars, forecast_df)
-write.csv(forecast_df[,c("PatientID","PANSS_Total")],'mars-forecast.csv',row.names=FALSE)
+test_df$PANSS_Total = predict(tuned_mars, test_df)
+write.csv(test_df[,c("PatientID","PANSS_Total")],'mars-forecast.csv',row.names=FALSE)
 ```
