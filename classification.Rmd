@@ -7,13 +7,35 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+
 ```
 
 # Notes/Assumptions
-- study E only I believe? 
-- predict 18th week total PANSS score 
-- i.e. create a sv file that contains the PatientID and the predicted 18th-week PANSS score
-- can submit predictions here https://www.kaggle.com/c/stanford-stats-202-forecasting/data
+- 
+### Model 
+  - LeadStatus is the response 
+  - likely predictors include
+    - Country 
+    - TxGroup
+    - VisitDay
+    - SiteID
+    - RaterID
+    - PANSS_Total (maybe)
+    - PatientID
+    - Study
+  - we will keep AssessmentID in our dataframe as a "key" for each row/patient. 
+  - exclude
+    - individual scores: hard to see how to interpret if they impact the assessment status. We'll have total score anyway.
+    
+  - when it comes time to predict, we specify a assessment ID and get a probability of LeadStatus being NOT Passed (so Flagged or Assigned to CS)
+  
+### Data
+  - We'll combine A-D into one dataset
+  - The training dataset will be 70% randomly chosen assessment IDs from that combined dataset
+  - The development dataset will be the other 30% of that.
+  - The test dataset for kaggle will be study E, for which we have no LeadStatus. 
+  
 
 # Thoughts/Conclusions
 
@@ -21,6 +43,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r Load Libraries, results="hide"}
 rm(list = ls()) # clear global environment 
 library(dplyr)
+library(ggplot2)
 ```
 
 ```{r Load Data}
@@ -29,16 +52,133 @@ B_df=read.csv("Data/Study_B.csv")
 C_df=read.csv("Data/Study_C.csv")
 D_df=read.csv("Data/Study_D.csv")
 E_df=read.csv("Data/Study_E.csv")
-summary(E_df)
-length(unique(E_df$PatientID))
+#summary(E_df)
+names(E_df)
+dim(E_df)[1]
 ```
-Note that most patients from study E are from USA or Russia (about an even split). 
 
-The following creates a list of the patients we should consider for the Kaggle submission. 
-```{r prediction-patients}
-sample_submission_df = read.csv("Data/sample_submission_PANSS.csv")
-prediction.patients = sample_submission_df$PatientID # the PatientID #s we should use for Kaggle submission 
-length(unique(prediction.patients)) # 379 distinct values 
-#n_distinct(prediction.patients)   # gives same result 
+The following creates a list of the assessments we should consider for the Kaggle submission. This should be the same as Study E. 
+```{r sample submission}
+sample_submission_df = read.csv("Data/sample_submission_status.csv")
+prediction.ids = sample_submission_df$AssessmentID # the AssessmentID #s we should use for Kaggle submission 
+length(unique(prediction.ids)) 
+length(prediction.ids)
+all(E_df$AssessmentiD==prediction.ids)
 ```
+This is the same length as Study E. All the values are in both. 
+
+## Data Cleaning
+Remove columns not corresponding to our predictors and response.
+
+```{r subset-df}
+A_df = subset(A_df, select = c(PatientID, Country, TxGroup, VisitDay, Study, PANSS_Total,SiteID,RaterID,AssessmentiD,LeadStatus))
+B_df = subset(B_df, select = c(PatientID, Country, TxGroup, VisitDay, Study, PANSS_Total,SiteID,RaterID,AssessmentiD,LeadStatus))
+C_df = subset(C_df, select = c(PatientID, Country, TxGroup, VisitDay, Study, PANSS_Total,SiteID,RaterID,AssessmentiD,LeadStatus))
+D_df = subset(D_df, select = c(PatientID, Country, TxGroup, VisitDay, Study, PANSS_Total,SiteID,RaterID,AssessmentiD,LeadStatus))
+E_df = subset(E_df, select = c(PatientID, Country, TxGroup, VisitDay, Study, PANSS_Total,SiteID,RaterID,AssessmentiD))
+```
+
+Combine studies
+```{r combine-studies}
+combined_df = rbind(A_df,B_df,C_df,D_df)
+summary(combined_df)
+names(combined_df)
+```
+Get rid of any duplicates, by AssessmentiD. And since we just want probability of flagged OR assigned to CS, turn LeadStatus into a binary classification of Passed or Flagged. We also need to make the ID numbers factors, not numeric data. Indeed, everything but VisitDay and PANSS_Total should be factorized. 
+```{r clean dup}
+dim(combined_df)[1]
+combined_df=distinct(combined_df)
+dim(combined_df)[1]
+length(combined_df$AssessmentiD)
+combined_df <- mutate_at(combined_df, vars(PatientID, Country, TxGroup, Study,SiteID,RaterID,AssessmentiD,LeadStatus), as.character)
+combined_df <- mutate_at(combined_df, vars(PatientID, Country, TxGroup, Study,SiteID,RaterID,AssessmentiD,LeadStatus), as.factor)
+
+str(combined_df)
+E_df<-mutate_at(E_df,vars(PatientID, Country, TxGroup, Study,SiteID,RaterID,AssessmentiD),as.factor)
+str(E_df)
+combined_df$LeadStatus[combined_df$LeadStatus!="Passed"]<-"Flagged"
+combined_df$LeadStatus=factor(combined_df$LeadStatus)
+table(combined_df$LeadStatus)
+
+```
+
+
+Split data into training, development, and test sets. What we mean by test set here is just Study E, where we have no response whatsoever. 
+```{r split data}
+set.seed(1)
+tot=1:dim(combined_df)[1]
+train=sample(tot,length(tot)*0.7)
+dev=tot[-train]
+combined.train=combined_df[train,]
+combined.dev=combined_df[dev,]
+test=E_df
+(combined.train)
+```
+
+First, try a Naive Bayes Classifier. To do this, we have to assume each predictor (PatientID, Country, TxGroup, VisitDay,Study,PANSS_Total,SiteID,RaterID,AssesmentiD) is independent. We also have to get rid of VisitDay as a predictor since Naive Bayes assumes a normal distribution for all quantitative predictors, which would make little sense here.
+```{r naive bayes classifier}
+library(dplyr)
+library(h2o)
+library(caret)
+library(corrplot)
+Y.train="LeadStatus"
+X.train=setdiff(names(combined.train),c(Y.train,"VisitDay"))
+
+#names(X.train)
+h2o.no_progress()
+h2o.init()
+
+combined.train.h2o <- combined.train %>%
+  mutate_if(is.factor, factor, ordered = FALSE) %>%
+  as.h2o()
+str(combined.train.h2o)
+train.nb <- h2o.naiveBayes(
+  x = X.train,
+  y = Y.train,
+  training_frame = combined.train.h2o,
+  nfolds = 10,
+  laplace = 0
+)
+
+# assess results on training data
+cM.nb=h2o.confusionMatrix(train.nb)
+accuracy.nb=(cM.nb[1,1]+cM.nb[2,2])/(cM.nb[3,1]+cM.nb[3,2])
+print(cM.nb)
+print(paste("Training error: =",accuracy.nb))
+
+# ROC curve on the development data
+combined.dev.h2o=combined.dev[,-4]#get rid of VisitDay
+names(combined.dev.h2o)
+combined.dev.h2o=combined.dev %>%
+  mutate_if(is.factor,factor,ordered=FALSE) %>%
+  as.h2o()
+
+performance.train=h2o.performance(train.nb,xval=TRUE)
+performance.dev=h2o.performance(train.nb,newdata=combined.dev.h2o)
+
+auc.train <- h2o.auc(performance.train,xval=TRUE)
+auc.dev <- h2o.auc(performance.dev)
+fpr.dev <- h2o.fpr(performance.dev) %>% .[['fpr']]
+tpr.dev <- h2o.tpr(performance.dev) %>% .[['tpr']]
+data.frame(fpr = fpr.dev, tpr = tpr.dev) %>%
+  ggplot(aes(fpr, tpr) ) +
+  geom_line() + 
+  ggtitle( sprintf('Development Dataset AUC: %f', auc.dev) )
+
+
+```
+
+The naive classifier doesn't do great on our holdout test data. The total accuracy is $0.86$ but the false and true positive rates are high. 
+
+We might try a logistic regression. In this case, we exclude the ID numbers (since they are categorical data that does not make sense to regress on).
+
+```{r logistic}
+combined.train.glm=subset(combined.train,select=c("Country","TxGroup","VisitDay","Study" ,"PANSS_Total","LeadStatus" ))
+attach(combined.train.glm)
+train.glm=glm(LeadStatus~.,data=combined.train.glm,family=binomial)
+summary(train.glm)
+contrasts(LeadStatus)
+```
+It looks like PANSS_Total, VisitDay, Study, TxGroup, and some countries are statistically significant predictors of Passed vs Flagged. 
+
 
