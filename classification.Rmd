@@ -23,11 +23,11 @@ knitr::opts_chunk$set(echo = TRUE)
     - RaterID
     - PANSS_Total (maybe)
     - PatientID
-    - Study
+    
   - we will keep AssessmentID in our dataframe as a "key" for each row/patient. 
   - exclude
     - individual scores: hard to see how to interpret if they impact the assessment status. We'll have total score anyway.
-    
+    - Study: no reason not to combine the data.
   - when it comes time to predict, we specify a assessment ID and get a probability of LeadStatus being NOT Passed (so Flagged or Assigned to CS)
   
 ### Data
@@ -71,11 +71,13 @@ This is the same length as Study E. All the values are in both.
 Remove columns not corresponding to our predictors and response.
 
 ```{r subset-df}
-A_df = subset(A_df, select = c(PatientID, Country, TxGroup, VisitDay, Study, PANSS_Total,SiteID,RaterID,AssessmentiD,LeadStatus))
-B_df = subset(B_df, select = c(PatientID, Country, TxGroup, VisitDay, Study, PANSS_Total,SiteID,RaterID,AssessmentiD,LeadStatus))
-C_df = subset(C_df, select = c(PatientID, Country, TxGroup, VisitDay, Study, PANSS_Total,SiteID,RaterID,AssessmentiD,LeadStatus))
-D_df = subset(D_df, select = c(PatientID, Country, TxGroup, VisitDay, Study, PANSS_Total,SiteID,RaterID,AssessmentiD,LeadStatus))
-E_df = subset(E_df, select = c(PatientID, Country, TxGroup, VisitDay, Study, PANSS_Total,SiteID,RaterID,AssessmentiD))
+A_df = subset(A_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
+B_df = subset(B_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
+C_df = subset(C_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
+D_df = subset(D_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
+names(E_df)
+E_df = subset(E_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,AssessmentiD))
+names(E_df)
 ```
 
 Combine studies
@@ -89,12 +91,12 @@ Get rid of any duplicates, by AssessmentiD. And since we just want probability o
 dim(combined_df)[1]
 combined_df=distinct(combined_df)
 dim(combined_df)[1]
-length(combined_df$AssessmentiD)
-combined_df <- mutate_at(combined_df, vars(PatientID, Country, TxGroup, Study,SiteID,RaterID,AssessmentiD,LeadStatus), as.character)
-combined_df <- mutate_at(combined_df, vars(PatientID, Country, TxGroup, Study,SiteID,RaterID,AssessmentiD,LeadStatus), as.factor)
+
+combined_df <- mutate_at(combined_df, vars(Country, TxGroup,LeadStatus), as.factor)
 
 str(combined_df)
-E_df<-mutate_at(E_df,vars(PatientID, Country, TxGroup, Study,SiteID,RaterID,AssessmentiD),as.factor)
+
+E_df<-mutate_at(E_df,vars(Country, TxGroup,AssessmentiD),as.factor)
 str(E_df)
 combined_df$LeadStatus[combined_df$LeadStatus!="Passed"]<-"Flagged"
 combined_df$LeadStatus=factor(combined_df$LeadStatus)
@@ -115,7 +117,7 @@ test=E_df
 (combined.train)
 ```
 
-First, try a Naive Bayes Classifier. To do this, we have to assume each predictor (PatientID, Country, TxGroup, VisitDay,Study,PANSS_Total,SiteID,RaterID,AssesmentiD) is independent. We also have to get rid of VisitDay as a predictor since Naive Bayes assumes a normal distribution for all quantitative predictors, which would make little sense here.
+First, try a Naive Bayes Classifier. To do this, we have to assume each predictor (PatientID, Country, TxGroup, VisitDay,Study,PANSS_Total,SiteID,RaterID,AssesmentiD) is independent. We also have to get rid of VisitDay as a predictor since Naive Bayes assumes a normal distribution for all quantitative predictors, which would make little sense here. Finally, to predict on Study E, we have to get rid of all the IDs not present in Study E (the IDs unique to other studies)
 ```{r naive bayes classifier}
 library(dplyr)
 library(h2o)
@@ -144,12 +146,14 @@ train.nb <- h2o.naiveBayes(
 cM.nb=h2o.confusionMatrix(train.nb)
 accuracy.nb=(cM.nb[1,1]+cM.nb[2,2])/(cM.nb[3,1]+cM.nb[3,2])
 print(cM.nb)
-print(paste("Training error: =",accuracy.nb))
+print(paste("Training accuracy: =",accuracy.nb))
+
 
 # ROC curve on the development data
-combined.dev.h2o=combined.dev[,-4]#get rid of VisitDay
+names(combined.dev)
+combined.dev.h2o=combined.dev[,-3]#get rid of VisitDay
 names(combined.dev.h2o)
-combined.dev.h2o=combined.dev %>%
+combined.dev.h2o=combined.dev.h2o %>%
   mutate_if(is.factor,factor,ordered=FALSE) %>%
   as.h2o()
 
@@ -167,6 +171,20 @@ data.frame(fpr = fpr.dev, tpr = tpr.dev) %>%
   geom_line() + 
   ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 
+# predict values with predict -->
+names(test)
+test.h2o=test[,-3]#get rid of VisitDay
+#test.h2o=test.h2o[,-4]#get rid of AssessmentiD
+test.h2o=test.h2o %>%
+  mutate_if(is.factor,factor,ordered=FALSE)%>%
+  as.h2o()
+str(test.h2o)
+
+nb.predictions=h2o.predict(train.nb,test.h2o)
+nb.predictions_df=as.data.frame(nb.predictions)
+test$LeadStatus=nb.predictions_df$Flagged
+test.output=test[,c("AssessmentiD","LeadStatus")]
+write.csv(test.output,"test.nb.csv",row.names=FALSE)
 
 ```
 
