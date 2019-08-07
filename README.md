@@ -4,7 +4,8 @@
 - part 1 and 2
   - go back and make sure we handled duplicates properly
 - part 3
-  - Implement models better suited for forecasting (not decision trees!)
+  - Take average over last two data points
+  - Simple linear regression 
 - part 4
 
 ## Notes from Google Group

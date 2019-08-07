@@ -208,13 +208,23 @@ Which returns the desired number of 379 rows.
 
 Finally, we would like our actually test set to best reflect the "18-th week" visit. To do so, we imagine each patient going back for assessment one week after whenever their final week was. So we add a value of 7 days to their `VisitDay`. We also drop the `FinalDay` column at this point. Also potentially scale the data here depending on the subsequent methods used. 
 ```{r create-test-set}
+dev_df = test_df # for calculating MSE later 
 test_df = subset(test_df, select = c(PatientID, Country, TxGroup, VisitDay, Study))
 test_df$VisitDay = test_df$VisitDay + 7 
 #select_patients_df$VisitDay = scale(select_patients_df$VisitDay)
 #select_patients_df$PANSS_Total = scale(select_patients_df$PANSS_Total)
+```
 
+### Naive forecasting
+Note that as a baseline we use the most recent `PANSS_Total` score as a baseline prediction from which to compare other groups to. 
+```{r naive}
 # create "Naive" submission 
 write.csv(select_patients_df[,c("PatientID","PANSS_Total")],'naive-forecast.csv',row.names=FALSE)
+```
+
+```{r total scores for given study}
+hist(E_df$PANSS_Total)
+hist(select_patients_df$PANSS_Total)
 ```
 
 ### Create training set
@@ -876,133 +886,136 @@ While we could scale some variables, scaling does not matter for decision trees!
 
 ## Linear models
 ```{r adjust-dataframes}
-#training_df = subset(training_df, select = c(PatientID, TxGroup, VisitDay, Study,PANSS_Total))
-#select_patients_df = subset(select_patients_df, select = c(PatientID, TxGroup, VisitDay, Study,PANSS_Total))
+training_df = subset(training_df, Study=="E", select = c(PatientID, TxGroup, VisitDay, Study, PANSS_Total))
+training_df = subset(training_df, select = c(PatientID, TxGroup, VisitDay, PANSS_Total))
+
+dev_df = subset(dev_df, Study=="E", select = c(PatientID, TxGroup, VisitDay, Study, PANSS_Total))
+dev_df = subset(dev_df, select = c(PatientID, TxGroup, VisitDay, PANSS_Total))
 ```
 
-<!-- ### Linear regression -->
-<!-- Fit a linear model using least squares on the training set, and report the test error obtained. -->
-<!-- ```{r linear} -->
-<!-- linear.mod = lm(PANSS_Total ~., data=training_df) -->
-<!-- summary(linear.mod) -->
+### Linear regression
+Fit a linear model using least squares on the training set, and report the test error obtained.
+```{r linear}
+linear.mod = lm(PANSS_Total ~., data=training_df)
+summary(linear.mod)
 
-<!-- # Calculate test MSE -->
-<!-- mean((select_patients_df$PANSS_Total - predict(linear.mod, select_patients_df))^2) -->
-<!-- ``` -->
+# Calculate test MSE
+mean((dev_df$PANSS_Total - predict(linear.mod, dev_df))^2)
+```
 
-<!-- ### Ridge regression -->
-<!-- Fit a ridge regression model on the training set, with λ chosen by cross-validation. Report the test error obtained. -->
-<!-- ```{r ridge} -->
-<!-- library(glmnet) -->
-<!-- set.seed(1) -->
+### Ridge regression
+Fit a ridge regression model on the training set, with λ chosen by cross-validation. Report the test error obtained.
+```{r ridge}
+library(glmnet)
+set.seed(1)
 
-<!-- # Create design matrices -->
-<!-- train.mat = model.matrix(PANSS_Total ~ .-PatientID, data = training_df) -->
-<!-- test.mat = model.matrix(PANSS_Total ~ .-PatientID, data = select_patients_df) -->
-<!-- # adding exp(-VisitDay) didn't seem to help much -->
+# Create design matrices
+train.mat = model.matrix(PANSS_Total ~ .-PatientID, data = training_df)
+test.mat = model.matrix(PANSS_Total ~ .-PatientID, data = dev_df)
+# adding exp(-VisitDay) didn't seem to help much
 
-<!-- # Ridge regression for array of lambda values -->
-<!-- #grid=10^seq(10,-3,length=100) -->
-<!-- #ridge.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=0,lambda=grid, thresh=1e-12) -->
-<!-- ridge.mod=glmnet(x = train.mat, y = training_df$PANSS_Total, alpha=0) -->
-<!-- plot(ridge.mod, xvar = "lambda") -->
+# Ridge regression for array of lambda values
+#grid=10^seq(10,-3,length=100)
+#ridge.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=0,lambda=grid, thresh=1e-12)
+ridge.mod=glmnet(x = train.mat, y = training_df$PANSS_Total, alpha=0)
+plot(ridge.mod, xvar = "lambda")
 
-<!-- # Find lambda through cross-validation -->
-<!-- cv.out = cv.glmnet(train.mat, training_df$PANSS_Total, alpha = 0) -->
-<!-- ridge.cv.out = cv.out  -->
-<!-- plot(cv.out) -->
-<!-- bestlam = cv.out$lambda.min -->
-<!-- bestlam -->
+# Find lambda through cross-validation
+cv.out = cv.glmnet(train.mat, training_df$PANSS_Total, alpha = 0)
+ridge.cv.out = cv.out
+plot(cv.out)
+bestlam = cv.out$lambda.min
+bestlam
 
-<!-- # Calculate test MSE -->
-<!-- ridge.pred=predict(ridge.mod,s=bestlam,newx=test.mat) -->
-<!-- mean((ridge.pred - select_patients_df$PANSS_Total)^2) -->
-<!-- ``` -->
-<!-- Note that the first and second vertical dashed lines represent the λ value with the minimum MSE and the largest λ value within one standard error of the minimum MSE. -->
+# Calculate test MSE
+ridge.pred=predict(ridge.mod,s=bestlam,newx=test.mat)
+mean((ridge.pred - dev_df$PANSS_Total)^2)
+```
+Note that the first and second vertical dashed lines represent the λ value with the minimum MSE and the largest λ value within one standard error of the minimum MSE.
 
-<!-- ```{r ridge-lambda} -->
-<!-- min(cv.out$cvm)       # minimum MSE -->
-<!-- cv.out$lambda.min     # lambda for this min MSE -->
+```{r ridge-lambda}
+min(cv.out$cvm)       # minimum MSE
+cv.out$lambda.min     # lambda for this min MSE
 
-<!-- cv.out$cvm[cv.out$lambda == cv.out$lambda.1se]  # 1 st.error of min MSE -->
-<!-- cv.out$lambda.1se  # lambda for this MSE -->
+cv.out$cvm[cv.out$lambda == cv.out$lambda.1se]  # 1 st.error of min MSE
+cv.out$lambda.1se  # lambda for this MSE
 
-<!-- # visualize how much we can restrain coefficients while still having predictive accuracy  -->
-<!-- ridge_min <- glmnet(x = train.mat, y = training_df$PANSS_Total, alpha=0) -->
-<!-- plot(ridge_min, xvar = "lambda") -->
-<!-- abline(v = log(cv.out$lambda.1se), col = "red", lty = "dashed") -->
+# visualize how much we can restrain coefficients while still having predictive accuracy
+ridge_min <- glmnet(x = train.mat, y = training_df$PANSS_Total, alpha=0)
+plot(ridge_min, xvar = "lambda")
+abline(v = log(cv.out$lambda.1se), col = "red", lty = "dashed")
 
-<!-- library(broom) -->
-<!-- coef(cv.out, s = "lambda.1se") %>% -->
-<!--   tidy() %>% -->
-<!--   filter(row != "(Intercept)") %>% -->
-<!--   top_n(25, wt = abs(value)) %>% -->
-<!--   ggplot(aes(value, reorder(row, value))) + -->
-<!--   geom_point() + -->
-<!--   ggtitle("Top 25 influential variables") + -->
-<!--   xlab("Coefficient") + -->
-<!--   ylab(NULL) -->
-<!-- ``` -->
+library(broom)
+coef(cv.out, s = "lambda.1se") %>%
+  tidy() %>%
+  filter(row != "(Intercept)") %>%
+  top_n(25, wt = abs(value)) %>%
+  ggplot(aes(value, reorder(row, value))) +
+  geom_point() +
+  ggtitle("Top 25 influential variables") +
+  xlab("Coefficient") +
+  ylab(NULL)
+```
 
-<!-- ### Lasso regression -->
-<!-- Fit a lasso model on the training set, with λ chosen by crossvalidation -->
-<!-- ```{r lasso} -->
-<!-- library(glmnet) -->
-<!-- set.seed(1) -->
+### Lasso regression
+Fit a lasso model on the training set, with λ chosen by crossvalidation
+```{r lasso}
+library(glmnet)
+set.seed(1)
 
-<!-- # Lasso regression for array of lambda values -->
-<!-- #grid=10^seq(10,-3,length=100) -->
-<!-- #lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1,lambda=grid, thresh=1e-12) -->
-<!-- lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1) -->
-<!-- plot(lasso.mod, xvar = "lambda") -->
+# Lasso regression for array of lambda values
+#grid=10^seq(10,-3,length=100)
+#lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1,lambda=grid, thresh=1e-12)
+lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1)
+plot(lasso.mod, xvar = "lambda")
 
-<!-- # Find lambda through cross-validation -->
-<!-- cv.out=cv.glmnet(train.mat, training_df$PANSS_Total,alpha=1) -->
-<!-- lasso.cv.out = cv.out  -->
-<!-- plot(cv.out) -->
-<!-- bestlam=cv.out$lambda.min -->
-<!-- bestlam -->
+# Find lambda through cross-validation
+cv.out=cv.glmnet(train.mat, training_df$PANSS_Total,alpha=1)
+lasso.cv.out = cv.out
+plot(cv.out)
+bestlam=cv.out$lambda.min
+bestlam
 
-<!-- # Calculate test MSE -->
-<!-- lasso.pred=predict(lasso.mod,s=bestlam,newx=test.mat) -->
-<!-- mean((lasso.pred-select_patients_df$PANSS_Total)^2) -->
+# Calculate test MSE
+lasso.pred=predict(lasso.mod,s=bestlam,newx=test.mat)
+mean((lasso.pred-dev_df$PANSS_Total)^2)
 
-<!-- predict(cv.out, s = bestlam, type = "coefficients") -->
-<!-- ``` -->
+predict(cv.out, s = bestlam, type = "coefficients")
+```
 
-<!-- ```{r lasso-error} -->
-<!-- min(cv.out$cvm)       # minimum MSE -->
-<!-- cv.out$lambda.min     # lambda for this min MSE -->
+```{r lasso-error}
+min(cv.out$cvm)       # minimum MSE
+cv.out$lambda.min     # lambda for this min MSE
 
-<!-- cv.out$cvm[cv.out$lambda == cv.out$lambda.1se]  # 1 st.error of min MSE -->
-<!-- cv.out$lambda.1se  # lambda for this MSE -->
+cv.out$cvm[cv.out$lambda == cv.out$lambda.1se]  # 1 st.error of min MSE
+cv.out$lambda.1se  # lambda for this MSE
 
-<!-- # visualize lasso results -->
-<!-- lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1) -->
-<!-- plot(lasso.mod, xvar = "lambda") -->
-<!-- abline(v = log(cv.out$lambda.min), col = "red", lty = "dashed") -->
-<!-- abline(v = log(cv.out$lambda.1se), col = "red", lty = "dashed") -->
+# visualize lasso results
+lasso.mod=glmnet(train.mat, training_df$PANSS_Total,alpha=1)
+plot(lasso.mod, xvar = "lambda")
+abline(v = log(cv.out$lambda.min), col = "red", lty = "dashed")
+abline(v = log(cv.out$lambda.1se), col = "red", lty = "dashed")
 
-<!-- # most influential variables -->
-<!-- coef(cv.out, s = "lambda.1se") %>% -->
-<!--   tidy() %>% -->
-<!--   filter(row != "(Intercept)") %>% -->
-<!--   ggplot(aes(value, reorder(row, value), color = value > 0)) + -->
-<!--   geom_point(show.legend = FALSE) + -->
-<!--   ggtitle("Influential variables") + -->
-<!--   xlab("Coefficient") + -->
-<!--   ylab(NULL) -->
-<!-- ``` -->
+# most influential variables
+coef(cv.out, s = "lambda.1se") %>%
+  tidy() %>%
+  filter(row != "(Intercept)") %>%
+  ggplot(aes(value, reorder(row, value), color = value > 0)) +
+  geom_point(show.legend = FALSE) +
+  ggtitle("Influential variables") +
+  xlab("Coefficient") +
+  ylab(NULL)
+```
 
-<!-- ```{r ridge-vs-lasso-error} -->
-<!-- # minimum Ridge MSE -->
-<!-- min(ridge.cv.out$cvm) -->
-<!-- plot(ridge.pred,select_patients_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100)) -->
+```{r ridge-vs-lasso-error}
+# minimum Ridge MSE
+min(ridge.cv.out$cvm)
+plot(ridge.pred,dev_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100))
 
-<!-- # minimum Lasso MSE -->
-<!-- min(lasso.cv.out$cvm) -->
-<!-- plot(lasso.pred,select_patients_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100)) -->
-<!-- ``` -->
+# minimum Lasso MSE
+min(lasso.cv.out$cvm)
+plot(lasso.pred,dev_df$PANSS_Total,xlim=c(20,100), ylim=c(20,100))
+```
 
 ## Multivariate Adaptive Regression Spline (MARS)
 <!-- ```{r basic-mars} -->
@@ -1080,9 +1093,9 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- ``` -->
 
 <!-- ```{r test-mse} -->
-<!-- test_predict = predict(tuned_mars, select_patients_df) -->
-<!-- mean((select_patients_df$PANSS_Total - test_predict)^2) -->
-<!-- plot(as.vector(test_predict), select_patients_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100))  -->
+<!-- test_predict = predict(tuned_mars, dev_df) -->
+<!-- mean((dev_df$PANSS_Total - test_predict)^2) -->
+<!-- plot(as.vector(test_predict), dev_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100))  -->
 <!-- abline(0,1)  -->
 
 <!-- test_df$PANSS_Total = predict(tuned_mars, test_df) -->
