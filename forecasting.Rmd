@@ -729,8 +729,8 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- # number of trees with lowest MSE -->
 <!-- which.min(m1$mse) -->
 
-<!-- # RMSE of this optimal random forest -->
-<!-- sqrt(m1$mse[which.min(m1$mse)]) -->
+<!-- # MSE of this optimal random forest -->
+<!-- m1$mse[which.min(m1$mse)] -->
 <!-- ``` -->
 
 <!-- ```{r rf-validation-set} -->
@@ -788,12 +788,12 @@ While we could scale some variables, scaling does not matter for decision trees!
 
 <!-- # second hypergrid -->
 <!-- hyper_grid.h2o <- list( -->
-<!--   ntrees      = seq(300, 550, by = 50),  -->
+<!--   ntrees      = seq(300, 550, by = 50), -->
 <!--   mtries      = 2, -->
-<!--   max_depth   = seq(15, 45, by = 5),  -->
-<!--   min_rows    = seq(7, 11, by = 1),  -->
-<!--   nbins       = seq(5, 25, by = 5),  -->
-<!--   sample_rate = c(0.4,0.45,0.5,0.55,.6,.65,.7)  -->
+<!--   max_depth   = seq(15, 45, by = 5), -->
+<!--   min_rows    = seq(7, 11, by = 1), -->
+<!--   nbins       = seq(5, 25, by = 5), -->
+<!--   sample_rate = c(0.4,0.45,0.5,0.55,.6,.65,.7) -->
 <!-- ) -->
 
 <!-- # random grid search criteria -->
@@ -838,13 +838,13 @@ While we could scale some variables, scaling does not matter for decision trees!
 
 <!-- # second hypergrid -->
 <!-- hyper_grid.h2o <- list( -->
-<!--   ntrees      = seq(350, 500, by = 75), # none of the top 5 use 500  -->
+<!--   ntrees      = seq(350, 500, by = 75), # none of the top 5 use 500 -->
 <!--   mtries      = 2, -->
-<!--   max_depth   = seq(20, 40, by = 5), # none of top 5 use 40  -->
-<!--   min_rows    = seq(5, 10, by = 2), # none of the top 5 models use 5  -->
-<!--   nbins       = seq(10, 30, by = 5), # none of top 5 use 10  -->
-<!--   sample_rate = c(0.45,.55, .65) # none of the top 5 models use sample_rate of 0.65  -->
-<!-- ) # best model from this has test MSE of 131.1589. best model while using study E gave 130.52. Latter scored 121.37919 on the public leaderboard. second time I ran this I had test MSE of 131.2212. Scored almost the same on Kaggle than when I dropped everything but Study E.  -->
+<!--   max_depth   = seq(20, 40, by = 5), # none of top 5 use 40 -->
+<!--   min_rows    = seq(5, 10, by = 2), # none of the top 5 models use 5 -->
+<!--   nbins       = seq(10, 30, by = 5), # none of top 5 use 10 -->
+<!--   sample_rate = c(0.45,.55, .65) # none of the top 5 models use sample_rate of 0.65 -->
+<!-- ) # best model from this has test MSE of 131.1589. best model while using study E gave 130.52. Latter scored 121.37919 on the public leaderboard. second time I ran this I had test MSE of 131.2212. Scored almost the same on Kaggle than when I dropped everything but Study E. -->
 <!-- ``` -->
 
 
@@ -858,10 +858,10 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- select_patients_df.h2o <- as.h2o(select_patients_df) -->
 <!-- best_model_perf <- h2o.performance(model = best_model, newdata = select_patients_df.h2o) -->
 
-<!-- # View prediction  -->
-<!-- prediction = predict(best_model, select_patients_df.h2o)  -->
+<!-- # View prediction -->
+<!-- prediction = predict(best_model, select_patients_df.h2o) -->
 <!-- plot(as.vector(prediction), select_patients_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100)) -->
-<!-- abline(0,1) # line with y-intercept 0 and slope 1  -->
+<!-- abline(0,1) # line with y-intercept 0 and slope 1 -->
 
 <!-- # RMSE of best model -->
 <!-- h2o.mse(best_model_perf) -->
@@ -1005,86 +1005,86 @@ While we could scale some variables, scaling does not matter for decision trees!
 <!-- ``` -->
 
 ## Multivariate Adaptive Regression Spline (MARS)
-```{r basic-mars}
-library(earth)     # fit MARS models
+<!-- ```{r basic-mars} -->
+<!-- library(earth)     # fit MARS models -->
 
-# Fit a basic MARS model
-mars1 <- earth(
-  PANSS_Total ~ .,  
-  data = training_df[,-"PatientID"]
-)
+<!-- # Fit a basic MARS model -->
+<!-- mars1 <- earth( -->
+<!--   PANSS_Total ~ .,   -->
+<!--   data = training_df[,-"PatientID"] -->
+<!-- ) -->
 
-# Print model summary
-print(mars1)
-summary(mars1) %>% .$coefficients %>% head(10)
-plot(mars1, which = 1)
-```
+<!-- # Print model summary -->
+<!-- print(mars1) -->
+<!-- summary(mars1) %>% .$coefficients %>% head(10) -->
+<!-- plot(mars1, which = 1) -->
+<!-- ``` -->
 
-```{r mars-interactions}
-# Fit a basic MARS model
-mars2 <- earth(
-  PANSS_Total ~ .,  
-  data = training_df[,-"PatientID"],
-  degree = 3
-)
+<!-- ```{r mars-interactions} -->
+<!-- # Fit a basic MARS model -->
+<!-- mars2 <- earth( -->
+<!--   PANSS_Total ~ .,   -->
+<!--   data = training_df[,-"PatientID"], -->
+<!--   degree = 3 -->
+<!-- ) -->
 
-# check out the first 10 coefficient terms
-print(mars2)
-summary(mars2) %>% .$coefficients %>% head(10)
-plot(mars2, which = 1)
-```
+<!-- # check out the first 10 coefficient terms -->
+<!-- print(mars2) -->
+<!-- summary(mars2) %>% .$coefficients %>% head(10) -->
+<!-- plot(mars2, which = 1) -->
+<!-- ``` -->
 
-### Tuning
-```{r mars-grid}
-# create a tuning grid
-hyper_grid <- expand.grid(
-  degree = 1:3, 
-  nprune = seq(1, 16, by = 2)
-  )
+<!-- ### Tuning -->
+<!-- ```{r mars-grid} -->
+<!-- # create a tuning grid -->
+<!-- hyper_grid <- expand.grid( -->
+<!--   degree = 1:3,  -->
+<!--   nprune = seq(1, 16, by = 2) -->
+<!--   ) -->
 
-head(hyper_grid)
-```
+<!-- head(hyper_grid) -->
+<!-- ``` -->
 
-```{r mars-tune}
-library(caret)
-set.seed(1)
+<!-- ```{r mars-tune} -->
+<!-- library(caret) -->
+<!-- set.seed(1) -->
 
-# cross validated model
-tuned_mars <- train(
-  x = subset(training_df[,-"PatientID"], select = -PANSS_Total),
-  y = training_df$PANSS_Total,
-  method = "earth",
-  metric = "RMSE",
-  trControl = trainControl(method = "cv", number = 10),
-  tuneGrid = hyper_grid
-)
+<!-- # cross validated model -->
+<!-- tuned_mars <- train( -->
+<!--   x = subset(training_df[,-"PatientID"], select = -PANSS_Total), -->
+<!--   y = training_df$PANSS_Total, -->
+<!--   method = "earth", -->
+<!--   metric = "RMSE", -->
+<!--   trControl = trainControl(method = "cv", number = 10), -->
+<!--   tuneGrid = hyper_grid -->
+<!-- ) -->
 
-# best model
-tuned_mars$bestTune
-summary(tuned_mars)
+<!-- # best model -->
+<!-- tuned_mars$bestTune -->
+<!-- summary(tuned_mars) -->
 
-# plot results
-ggplot(tuned_mars)
-```
-See http://uc-r.github.io/mars for how to visualize/interpret results further. 
+<!-- # plot results -->
+<!-- ggplot(tuned_mars) -->
+<!-- ``` -->
+<!-- See http://uc-r.github.io/mars for how to visualize/interpret results further.  -->
 
-### Visualize
-```{r mars-importance}
-library(vip)       # variable importance
+<!-- ### Visualize -->
+<!-- ```{r mars-importance} -->
+<!-- library(vip)       # variable importance -->
 
-# variable importance plots
-p1 <- vip(tuned_mars, num_features = 40, bar = FALSE, value = "gcv") + ggtitle("GCV")
-p2 <- vip(tuned_mars, num_features = 40, bar = FALSE, value = "rss") + ggtitle("RSS")
+<!-- # variable importance plots -->
+<!-- p1 <- vip(tuned_mars, num_features = 40, bar = FALSE, value = "gcv") + ggtitle("GCV") -->
+<!-- p2 <- vip(tuned_mars, num_features = 40, bar = FALSE, value = "rss") + ggtitle("RSS") -->
 
-gridExtra::grid.arrange(p1, p2, ncol = 2)
-```
+<!-- gridExtra::grid.arrange(p1, p2, ncol = 2) -->
+<!-- ``` -->
 
-```{r test-mse}
-test_predict = predict(tuned_mars, select_patients_df)
-mean((select_patients_df$PANSS_Total - test_predict)^2)
-plot(as.vector(test_predict), select_patients_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100)) 
-abline(0,1) 
+<!-- ```{r test-mse} -->
+<!-- test_predict = predict(tuned_mars, select_patients_df) -->
+<!-- mean((select_patients_df$PANSS_Total - test_predict)^2) -->
+<!-- plot(as.vector(test_predict), select_patients_df$PANSS_Total,xlim=c(30,100), ylim=c(30,100))  -->
+<!-- abline(0,1)  -->
 
-test_df$PANSS_Total = predict(tuned_mars, test_df)
-write.csv(test_df[,c("PatientID","PANSS_Total")],'mars-forecast.csv',row.names=FALSE)
-```
+<!-- test_df$PANSS_Total = predict(tuned_mars, test_df) -->
+<!-- write.csv(test_df[,c("PatientID","PANSS_Total")],'mars-forecast.csv',row.names=FALSE) -->
+<!-- ``` -->
