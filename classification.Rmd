@@ -338,41 +338,63 @@ write.csv(test,"Predictions/qda-prediction.csv",row.names=FALSE)
 ```
 
 ## SVM
-SVMs might work but the issue is we do not have much experience in obtaining probabilities from SVMs. 
-<!-- ```{r svm-intro} -->
-<!-- library(e1071)        # SVM methodology -->
-<!-- set.seed(1) -->
+```{r svm-intro}
+library(e1071)        # SVM methodology
+set.seed(1)
 
-<!-- svmfit <- svm(LeadStatus~., data = combined.train, kernel = "linear", scale=TRUE) -->
-<!-- summary(svmfit) -->
-<!-- ``` -->
+svmfit <- svm(LeadStatus~., data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE)
+summary(svmfit)
+```
 
-<!-- ```{r svm-tune} -->
-<!-- # find optimal cost of misclassification -->
-<!-- tune.out <- tune(svm, LeadStatus~., data = combined.train, kernel = "linear", -->
-<!--                  ranges = list(cost = c(0.01, 0.1, 1, 10))) -->
-<!-- # extract the best model -->
-<!-- (bestmod <- tune.out$best.model) -->
-<!-- ``` -->
+```{r svm-tune}
+# find optimal cost of misclassification
+tune.out <- tune(svm, LeadStatus~., data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], gamma = 10^(-5:-1), cost = 10^(-3:1), probability=TRUE)
+# extract the best model
+(bestmod <- tune.out$best.model)
+```
 
-<!-- ```{r svm-accuracy} -->
-<!-- dev.svm.pred = predict(svmfit) -->
-<!-- table(dev.svm.pred, combined.train$LeadStatus) -->
+```{r svm-accuracy}
+dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE)
+table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3)
 
-<!-- dev.svm.pred = predict(svmfit, newdata=combined.dev) -->
-<!-- table(dev.svm.pred, combined.dev$LeadStatus) -->
+# accuracy rate
+mean(dev.svm.pred == combined.dev$LeadStatus)
 
-<!-- table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3) -->
+# error rate
+mean(dev.svm.pred != combined.dev$LeadStatus)
+```
 
-<!-- # accuracy rate -->
-<!-- mean(dev.svm.pred == combined.dev$LeadStatus) -->
+```{r roc-curve-svm}
+# ROC curves
+probabilities = attr(dev.svm.pred, "probabilities")
+prediction(probabilities[,1], combined.dev$LeadStatus) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot()
 
-<!-- # error rate -->
-<!-- mean(dev.svm.pred != combined.dev$LeadStatus) -->
+# AUC
+prediction(probabilities[,1], combined.dev$LeadStatus) %>%
+  performance(measure = "auc") %>%
+  .@y.values
 
-<!-- # log loss -->
-<!-- library(ModelMetrics) -->
-<!-- logLoss(combined.dev$LeadStatus,dev.svm.pred) -->
-<!-- ``` -->
+# Cross-entropy 
+prediction(probabilities[,1], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
+  performance(measure = "mxe") %>%
+  .@y.values
+```
+
+```{r write-svm-result}
+test=E_df
+test.svm.pred = predict(svmfit, newdata = test, probability=TRUE)
+probabilities = attr(test.svm.pred, "probabilities")
+test$LeadStatus = probabilities[,2]
+test = test[,c("AssessmentiD","LeadStatus")]
+
+# compare to logistic regression
+plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
+abline(0,1)
+
+# write for kaggle prediction 
+write.csv(test,"Predictions/svm-prediction.csv",row.names=FALSE)
+```
 
 ## xgboost 
