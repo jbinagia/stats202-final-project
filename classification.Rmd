@@ -348,7 +348,7 @@ summary(svmfit)
 
 ```{r svm-tune}
 # find optimal cost of misclassification
-tune.out <- tune(svm, LeadStatus~., data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges = list(gamma = 10^(-5:1), cost = 10^(-3:1)), probability=TRUE)
+tune.out <- tune(svm, LeadStatus~., data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges = list(gamma = 10^(-2:1), cost = 10^(-2:1)), probability=TRUE)
 # extract the best model
 summary(tune.out)
 (bestmod <- tune.out$best.model)
