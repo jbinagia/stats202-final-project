@@ -7,12 +7,9 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
-
 ```
 
 # Notes/Assumptions
-- 
 ### Model 
   - LeadStatus is the response 
   - likely predictors include
@@ -86,37 +83,46 @@ combined_df = rbind(A_df,B_df,C_df,D_df)
 summary(combined_df)
 names(combined_df)
 ```
-Get rid of any duplicates, by AssessmentiD. And since we just want probability of flagged OR assigned to CS, turn LeadStatus into a binary classification of Passed or Flagged. We also need to make the ID numbers factors, not numeric data. Indeed, everything but VisitDay and PANSS_Total should be factorized. 
-```{r clean dup}
+Get rid of any duplicates, by AssessmentiD. 
+```{r remove duplicates}
 dim(combined_df)[1]
 combined_df=distinct(combined_df)
 dim(combined_df)[1]
-
+```
+We also need to make the ID numbers factors, not numeric data. Indeed, everything but VisitDay and PANSS_Total should be factorized. 
+```{r factor}
 combined_df <- mutate_at(combined_df, vars(Country, TxGroup,LeadStatus), as.factor)
-
-str(combined_df)
+str(combined_df) # compactly display structure of the object 
 
 E_df<-mutate_at(E_df,vars(Country, TxGroup,AssessmentiD),as.factor)
 str(E_df)
+```
+
+And since we just want probability of flagged OR assigned to CS, turn LeadStatus into a binary classification of Passed or Flagged. 
+```{r reclassify}
 combined_df$LeadStatus[combined_df$LeadStatus!="Passed"]<-"Flagged"
 combined_df$LeadStatus=factor(combined_df$LeadStatus)
 table(combined_df$LeadStatus)
-
 ```
 
 
 Split data into training, development, and test sets. What we mean by test set here is just Study E, where we have no response whatsoever. 
 ```{r split data}
 set.seed(1)
-tot=1:dim(combined_df)[1]
-train=sample(tot,length(tot)*0.7)
-dev=tot[-train]
+tot=1:dim(combined_df)[1] # total number of observations 
+
+train=sample(tot,length(tot)*0.7) # put 70% of observations into training set 
 combined.train=combined_df[train,]
+head(combined.train)
+
+dev=tot[-train] # rest go into development set 
 combined.dev=combined_df[dev,]
-test=E_df
-(combined.train)
+test=E_df # study E is the test set 
 ```
 
+# Classification 
+
+## Naive Bayes
 First, try a Naive Bayes Classifier. To do this, we have to assume each predictor (PatientID, Country, TxGroup, VisitDay,Study,PANSS_Total,SiteID,RaterID,AssesmentiD) is independent. We also have to get rid of VisitDay as a predictor since Naive Bayes assumes a normal distribution for all quantitative predictors, which would make little sense here. Finally, to predict on Study E, we have to get rid of all the IDs not present in Study E (the IDs unique to other studies)
 ```{r naive bayes classifier}
 library(dplyr)
@@ -190,12 +196,13 @@ write.csv(test.output,"test.nb.csv",row.names=FALSE)
 
 The naive classifier doesn't do great on our holdout test data. The total development AUC is $0.77$ but the false and true positive rates are high. 
 
+## Logistic 
 We might try a logistic regression. However, Study E has no country of UK, so we take out the country as a predictor. 
 
 ```{r logistic}
 library(pROC)
 names(combined.train)
-combined.train.glm=combined.train[,-1]#take out country
+combined.train.glm=combined.train[,-1] # exclude country from being a predictor 
 attach(combined.train.glm)
 names(combined.train.glm)
 train.glm=glm(LeadStatus~.,data=combined.train.glm,family=binomial)
@@ -209,6 +216,7 @@ glm.pred[glm.probs.flag.dev>0.2]="Flagged"#change relevant values to "Flagged" b
 table(glm.pred,combined.dev$LeadStatus)
 roc.dev=roc(LeadStatus~glm.probs.flag.dev,data=combined.dev)
 plot(roc.dev,xlim=c(0,1),ylim=c(0,1))
+
 #kaggle test
 test=E_df
 glm.probs=predict(train.glm,test,type="response")#compute predictions based on fit for each observation; 1 corresponds to Passed
@@ -226,3 +234,145 @@ It looks like PANSS_Total, VisitDay, Study, TxGroup, and some countries are stat
 plot(test.output.glm$LeadStatus,nb.predictions_df$Flagged,xlim=c(0,0.5),ylim=c(0,0.5))
 abline(0,1)
 ```
+
+## LDA
+Study E has no country of UK, so we take out the country as a predictor. 
+```{r lda-start}
+library(MASS)       # provides LDA & QDA model functions
+(lda.m1 = lda(LeadStatus~., data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")]))
+plot(lda.m1)
+```
+
+We can now use our LDA model to make a prediction on the development set
+```{r lda-predict}
+dev.lda.pred = predict(lda.m1, newdata = combined.dev)
+table(combined.dev$LeadStatus, dev.lda.pred$class) %>% prop.table() %>% round(3)
+
+# accuracy rate
+mean(dev.lda.pred$class == combined.dev$LeadStatus)
+
+# error rate
+mean(dev.lda.pred$class != combined.dev$LeadStatus)
+```
+
+```{r roc-curve}
+# ROC curves
+library(ROCR)
+prediction(dev.lda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot()
+
+# AUC
+prediction(dev.lda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "auc") %>%
+  .@y.values
+
+# Cross-entropy 
+prediction(dev.lda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
+  performance(measure = "mxe") %>%
+  .@y.values
+```
+
+```{r write-lda-result}
+test.lda.pred = predict(lda.m1, newdata = test)
+test$LeadStatus = test.lda.pred$posterior[,1]
+test = test[,c("AssessmentiD","LeadStatus")]
+
+# compare to logistic regression
+plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
+abline(0,1)
+
+# write for kaggle prediction 
+write.csv(test,"Predictions/lda-prediction.csv",row.names=FALSE)
+```
+
+
+
+## QDA
+I would like to try QDA but it was giving me errors. 
+```{r qda-start}
+(qda.m1 = qda(LeadStatus~., data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")]))
+```
+
+We can now use our QDA model to make a prediction on the development set
+```{r qda-predict}
+dev.qda.pred = predict(qda.m1, newdata = combined.dev)
+table(combined.dev$LeadStatus, dev.qda.pred$class) %>% prop.table() %>% round(3)
+
+# accuracy rate
+mean(dev.qda.pred$class == combined.dev$LeadStatus)
+
+# error rate
+mean(dev.qda.pred$class != combined.dev$LeadStatus)
+```
+```{r roc-curve-qda}
+# ROC curves
+library(ROCR)
+prediction(dev.qda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot()
+
+# AUC
+prediction(dev.qda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "auc") %>%
+  .@y.values
+
+# Cross-entropy 
+prediction(dev.qda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
+  performance(measure = "mxe") %>%
+  .@y.values
+```
+
+```{r write-qda-result}
+test=E_df
+test.qda.pred = predict(qda.m1, newdata = test)
+test$LeadStatus = test.qda.pred$posterior[,1]
+test = test[,c("AssessmentiD","LeadStatus")]
+
+# compare to logistic regression
+plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
+abline(0,1)
+
+# write for kaggle prediction 
+write.csv(test,"Predictions/qda-prediction.csv",row.names=FALSE)
+```
+
+## SVM
+SVMs might work but the issue is we do not have much experience in obtaining probabilities from SVMs. 
+<!-- ```{r svm-intro} -->
+<!-- library(e1071)        # SVM methodology -->
+<!-- set.seed(1) -->
+
+<!-- svmfit <- svm(LeadStatus~., data = combined.train, kernel = "linear", scale=TRUE) -->
+<!-- summary(svmfit) -->
+<!-- ``` -->
+
+<!-- ```{r svm-tune} -->
+<!-- # find optimal cost of misclassification -->
+<!-- tune.out <- tune(svm, LeadStatus~., data = combined.train, kernel = "linear", -->
+<!--                  ranges = list(cost = c(0.01, 0.1, 1, 10))) -->
+<!-- # extract the best model -->
+<!-- (bestmod <- tune.out$best.model) -->
+<!-- ``` -->
+
+<!-- ```{r svm-accuracy} -->
+<!-- dev.svm.pred = predict(svmfit) -->
+<!-- table(dev.svm.pred, combined.train$LeadStatus) -->
+
+<!-- dev.svm.pred = predict(svmfit, newdata=combined.dev) -->
+<!-- table(dev.svm.pred, combined.dev$LeadStatus) -->
+
+<!-- table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3) -->
+
+<!-- # accuracy rate -->
+<!-- mean(dev.svm.pred == combined.dev$LeadStatus) -->
+
+<!-- # error rate -->
+<!-- mean(dev.svm.pred != combined.dev$LeadStatus) -->
+
+<!-- # log loss -->
+<!-- library(ModelMetrics) -->
+<!-- logLoss(combined.dev$LeadStatus,dev.svm.pred) -->
+<!-- ``` -->
+
+## xgboost 
