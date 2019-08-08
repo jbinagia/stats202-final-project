@@ -174,7 +174,7 @@ fpr.dev <- h2o.fpr(performance.dev) %>% .[['fpr']]
 tpr.dev <- h2o.tpr(performance.dev) %>% .[['tpr']]
 data.frame(fpr = fpr.dev, tpr = tpr.dev) %>%
   ggplot(aes(fpr, tpr) ) +
-  geom_line() + 
+  geom_line() +
   ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 
 # predict values with predict -->
@@ -194,7 +194,7 @@ write.csv(test.output,"test.nb.csv",row.names=FALSE)
 
 ```
 
-The naive classifier doesn't do great on our holdout test data. The total development AUC is $0.77$ but the false and true positive rates are high. 
+The naive classifier doesn't do great on our holdout test data. The total development AUC is $0.77$ but the false and true positive rates are high.
 
 ## Logistic 
 We might try a logistic regression. However, Study E has no country of UK, so we take out the country as a predictor. 
@@ -225,7 +225,7 @@ names(test)
 test.output.glm=as.data.frame(test$AssessmentiD)
 test.output.glm$LeadStatus=glm.probs.flag
 colnames(test.output.glm)[colnames(test.output.glm)=="AssessmentiD"] <- "AssessmentID"
-write.csv(test.output.glm,"test.glm.csv",row.names=FALSE)
+write.csv(test.output.glm,"Predictions/test.glm.csv",row.names=FALSE)
 
 ```
 It looks like PANSS_Total, VisitDay, Study, TxGroup, and some countries are statistically significant predictors of Passed vs Flagged. 
@@ -342,13 +342,18 @@ write.csv(test,"Predictions/qda-prediction.csv",row.names=FALSE)
 library(e1071)        # SVM methodology
 set.seed(1)
 
-svmfit <- svm(LeadStatus~., data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE)
+svmfit <- svm(LeadStatus~., kernel = "linear",data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE)
 summary(svmfit)
+```
+
+```{r plot-svm-model}
+plot.svm(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment") )
+plot.svm(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control") )
 ```
 
 ```{r svm-tune}
 # find optimal cost of misclassification
-tune.out <- tune(svm, LeadStatus~., data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges = list(gamma = 10^(-2:1), cost = 10^(-2:1)), probability=TRUE)
+tune.out <- tune(svm, LeadStatus~., kernel = "linear", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges = list(cost = 10^(-2:1)), probability=TRUE)
 # extract the best model
 summary(tune.out)
 (bestmod <- tune.out$best.model)
