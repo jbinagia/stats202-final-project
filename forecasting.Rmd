@@ -12,8 +12,7 @@ rm(list = ls()) # clear global environment
 library(h2o)          # a java-based platform
 library(plyr)
 library(ggplot2)
-library(ggrepel)
-library(RColorBrewer)
+library(ggsci)
 ```
 
 ## Notes/Assumptions
@@ -247,14 +246,8 @@ print(p)
 ```
 We can now see why the naive prediction works so well. At this point in the study, these patients scores have virtually stopped changing with respect to time. Thus, an "alright" prediction for their next visit is simply what they scored on their most recent visit. 
 
-To remove some variance from this naive prediction, we can take the simple average of these last two visit scores:
-```{r average-last-two-scores}
-#naive_df = subset(E_df, PatientID %in% prediction.patients, select = c("PatientID","VisitDay","PANSS_Total")) # start with study E
-#dim(naive_df)[1]
-
-#naive_df = distinct(naive_df) # remove duplicates
-#dim(naive_df)[1]
-
+To remove some variance from this naive prediction, we can take the simple average of these last two visit scores. First, we need to take note of the `VisitDay` and `PANSS_Total` for the second to last day. 
+```{r find-data-second-to-last-day}
 naive_df = subset(dev_df, select = c("PatientID","VisitDay","PANSS_Total")) # start with dev set
 names(naive_df)[2] = "LastVisitDay" # rename column
 names(naive_df)[3] = "FinalScore" # rename column
@@ -286,7 +279,9 @@ for (id in naive_df$PatientID) { # for each unique id
     }
   }
 }
+```
 
+```{r combine-time-history}
 # average final two scores
 naive_df$FinalScore = as.numeric(naive_df$FinalScore)
 naive_df$PANSS_Total = as.numeric(naive_df$FinalScore)
@@ -302,6 +297,62 @@ for (id in naive_df$PatientID) { # for each unique id
 # create submission script
 write.csv(naive_df[,c("PatientID","PANSS_Total")],'less-naive-forecast.csv',row.names=FALSE)
 ```
+
+We can repeat this process, now storing data for the third day. 
+```{r find-data-third-to-last-day}
+
+# find third to last visit day 
+for (id in naive_df$PatientID) { # for each unique id
+  sub_df = subset(E_df, PatientID==id)
+  x = sub_df$VisitDay
+  n <- length(x)
+  if (n<3) {
+    naive_df[naive_df$PatientID == id,"ThirdToLastDay"] = NA
+  }else{
+    naive_df[naive_df$PatientID == id,"ThirdToLastDay"] = sort(x,partial=n-2)[n-2]
+  }
+}
+
+# find third to last score 
+naive_df$ThirdToLastScore = as.numeric(naive_df$FinalScore)
+for (id in naive_df$PatientID) { # for each unique id
+  day = as.integer(naive_df[naive_df$PatientID == id,"ThirdToLastDay"])
+  if (is.na(day)){
+    naive_df[naive_df$PatientID == id,"ThirdToLastScore"] = NA
+  }else{
+    sub_df = subset(E_df, PatientID==id & VisitDay==day)
+    if (dim(sub_df)[1] > 1){ # take simple average in this case
+      naive_df[naive_df$PatientID == id,"ThirdToLastScore"] = mean(sub_df$PANSS_Total)
+    }else{
+      naive_df[naive_df$PatientID == id,"ThirdToLastScore"] = sub_df$PANSS_Total
+    }
+  }
+}
+```
+
+To weigh historical data that does not follow a strong trend (i.e. the patient scores towards the end of the study), we can use the idea of exponential smoothing (http://uc-r.github.io/ts_exp_smoothing). 
+```{r combine-time-history}
+naive_df$PANSS_Total = 0*naive_df$PANSS_Total
+for (id in naive_df$PatientID) { # for each unique id
+  day = as.integer(naive_df[naive_df$PatientID == id,"SecondToLastDay"])
+  if (is.na(day)){
+    naive_df[naive_df$PatientID == id,"PANSS_Total"] = naive_df[naive_df$PatientID == id,"FinalScore"]
+  }else{
+    day2 = as.integer(naive_df[naive_df$PatientID == id,"ThirdToLastDay"])
+    if (is.na(day2)){
+      alpha = 0.9
+      naive_df[naive_df$PatientID == id,"PANSS_Total"] = alpha*naive_df[naive_df$PatientID == id,"FinalScore"] + alpha*(1-alpha)*naive_df[naive_df$PatientID == id,"SecondToLastScore"]
+    }else{
+      alpha = 0.8
+      naive_df[naive_df$PatientID == id,"PANSS_Total"] = alpha*naive_df[naive_df$PatientID == id,"FinalScore"] + alpha*(1-alpha)*naive_df[naive_df$PatientID == id,"SecondToLastScore"]  + alpha*(1-alpha)^2*naive_df[naive_df$PatientID == id,"ThirdToLastScore"]
+    }
+  }
+}
+
+# create submission script
+write.csv(naive_df[,c("PatientID","PANSS_Total")],'less-naive-forecast.csv',row.names=FALSE)
+```
+
 
 ### Create training set
 ```{r remove-test-from-total}
