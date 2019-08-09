@@ -3,8 +3,8 @@ title: "Patient Segmentation"
 author: "Jeremy Binagia and Sai Gourisankar"
 date: "7/5/2019"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -254,7 +254,7 @@ fviz_contrib(res.pca, choice = "var", axes = 3, top = 10)
 ```
 
 ### individuals pca but colored by study
-```{r individuals-country}
+```{r individuals-study}
 omission_vector = c("Country","PatientID","SiteID","RaterID",
                 "AssessmentiD","TxGroup","VisitDay","PANSS_Total","LeadStatus")
 combined_all_col = rbind(A_df[ , -which(names(A_df) %in% omission_vector)],B_df[ , -which(names(A_df) %in% omission_vector)],C_df[ , -which(names(A_df) %in% omission_vector)],D_df[ , -which(names(A_df) %in% omission_vector)],E_df[ , -which(names(A_df) %in% omission_vector)])
