@@ -383,7 +383,7 @@ write.csv(test,"Predictions/qda-prediction.csv",row.names=FALSE)
 
 ## SVM
 ### Linear
-```{r svm-intro}
+```{r svm-intro232213213}
 library(e1071)        # SVM methodology
 set.seed(1)
 
@@ -391,13 +391,13 @@ svmfit <- svm(LeadStatus~., kernel = "linear",data = combined.train[,c("TxGroup"
 summary(svmfit)
 ```
 
-```{r plot-svm-model}
+```{r plot-svm-model12321}
 plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE)
 plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE)
 ```
 Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line. 
 
-```{r svm-tune}
+```{r svm-tune123213}
 # # find optimal cost of misclassification
 # tune.out <- tune(svm, LeadStatus~., kernel = "linear", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100)), probability=TRUE)
 # # extract the best model
@@ -406,7 +406,7 @@ Points that are represented by an “X” are the support vectors, or the points
 # summary(bestmod)
 ```
 
-```{r svm-accuracy}
+```{r svm-accuracy123213}
 dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE)
 table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3)
 
@@ -417,7 +417,7 @@ mean(dev.svm.pred == combined.dev$LeadStatus)
 mean(dev.svm.pred != combined.dev$LeadStatus)
 ```
 
-```{r roc-curve-svm}
+```{r roc-curve-svm123213}
 # ROC curves
 probabilities = attr(dev.svm.pred, "probabilities")
 prediction(probabilities[,2], combined.dev$LeadStatus) %>%
@@ -435,7 +435,7 @@ prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %
   .@y.values
 ```
 
-```{r write-svm-result}
+```{r write-svm-result123213}
 test=E_df
 test.svm.pred = predict(svmfit, newdata = test, probability=TRUE)
 probabilities = attr(test.svm.pred, "probabilities")
