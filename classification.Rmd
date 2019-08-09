@@ -44,14 +44,14 @@ library(ggplot2)
 ```
 
 ```{r Load Data}
-A_df=read.csv("Data/Study_A.csv")
-B_df=read.csv("Data/Study_B.csv")
-C_df=read.csv("Data/Study_C.csv")
-D_df=read.csv("Data/Study_D.csv")
-E_df=read.csv("Data/Study_E.csv")
-#summary(E_df)
-names(E_df)
-dim(E_df)[1]
+A_init_df=read.csv("Data/Study_A.csv")
+B_init_df=read.csv("Data/Study_B.csv")
+C_init_df=read.csv("Data/Study_C.csv")
+D_init_df=read.csv("Data/Study_D.csv")
+E_init_df=read.csv("Data/Study_E.csv")
+#summary(E_init_df)
+names(E_init_df)
+dim(E_init_df)[1]
 ```
 
 The following creates a list of the assessments we should consider for the Kaggle submission. This should be the same as Study E. 
@@ -60,7 +60,7 @@ sample_submission_df = read.csv("Data/sample_submission_status.csv")
 prediction.ids = sample_submission_df$AssessmentID # the AssessmentID #s we should use for Kaggle submission 
 length(unique(prediction.ids)) 
 length(prediction.ids)
-all(E_df$AssessmentiD==prediction.ids)
+all(E_init_df$AssessmentiD==prediction.ids)
 ```
 This is the same length as Study E. All the values are in both. 
 
@@ -68,12 +68,12 @@ This is the same length as Study E. All the values are in both.
 Remove columns not corresponding to our predictors and response.
 
 ```{r subset-df}
-A_df = subset(A_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
-B_df = subset(B_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
-C_df = subset(C_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
-D_df = subset(D_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
-names(E_df)
-E_df = subset(E_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,AssessmentiD))
+A_df = subset(A_init_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
+B_df = subset(B_init_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
+C_df = subset(C_init_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
+D_df = subset(D_init_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,LeadStatus))
+names(E_init_df)
+E_df = subset(E_init_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,AssessmentiD))
 names(E_df)
 ```
 
@@ -449,6 +449,77 @@ abline(0,1)
 # write for kaggle prediction 
 write.csv(test,"Predictions/svm-prediction.csv",row.names=FALSE)
 ```
+
+### Linear (all PANSS scores)
+```{r recreate-data-frames}
+
+```
+
+```{r svm-intro}
+set.seed(1)
+svmfit <- svm(LeadStatus~., kernel = "linear",data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE)
+summary(svmfit)
+```
+
+```{r plot-svm-model}
+plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE)
+plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE)
+```
+Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line. 
+
+```{r svm-tune}
+# # find optimal cost of misclassification
+# tune.out <- tune(svm, LeadStatus~., kernel = "linear", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100)), probability=TRUE)
+# # extract the best model
+# summary(tune.out)
+# (bestmod <- tune.out$best.model)
+# summary(bestmod)
+```
+
+```{r svm-accuracy}
+dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE)
+table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3)
+
+# accuracy rate
+mean(dev.svm.pred == combined.dev$LeadStatus)
+
+# error rate
+mean(dev.svm.pred != combined.dev$LeadStatus)
+```
+
+```{r roc-curve-svm}
+# ROC curves
+probabilities = attr(dev.svm.pred, "probabilities")
+prediction(probabilities[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot()
+
+# AUC
+prediction(probabilities[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "auc") %>%
+  .@y.values
+
+# Cross-entropy 
+prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
+  performance(measure = "mxe") %>%
+  .@y.values
+```
+
+```{r write-svm-result}
+test=E_df
+test.svm.pred = predict(svmfit, newdata = test, probability=TRUE)
+probabilities = attr(test.svm.pred, "probabilities")
+test$LeadStatus = probabilities[,1]
+test = test[,c("AssessmentiD","LeadStatus")]
+
+# compare to logistic regression
+plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
+abline(0,1)
+
+# write for kaggle prediction 
+write.csv(test,"Predictions/svm-all-pred-prediction.csv",row.names=FALSE)
+```
+
 
 ### Radial
 ```{r svm-radial}
