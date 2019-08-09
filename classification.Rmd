@@ -709,7 +709,7 @@ search_criteria=list(
   stopping_metric="logloss",
   stopping_tolerance=0.005,
   stopping_rounds=10,
-  max_runtime_secs=60*60*5
+  max_runtime_secs=60*10
 )
 
 grid=h2o.grid(
@@ -791,7 +791,7 @@ search_criteria=list(
   stopping_metric="logloss",
   stopping_tolerance=0.005,
   stopping_rounds=10,
-  max_runtime_secs=60
+  max_runtime_secs=60*10 # 10 min
 )
 grid=h2o.grid(
   algorithm = "gbm",
