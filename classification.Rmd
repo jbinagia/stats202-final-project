@@ -354,11 +354,12 @@ plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],
 Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line. 
 
 ```{r svm-tune}
-# # find optimal cost of misclassification
-# tune.out <- tune(svm, LeadStatus~., kernel = "linear", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges = list(cost = 10^(-2:1)), probability=TRUE)
-# # extract the best model
-# summary(tune.out)
-# (bestmod <- tune.out$best.model)
+# find optimal cost of misclassification
+tune.out <- tune(svm, LeadStatus~., kernel = "linear", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100)), probability=TRUE)
+# extract the best model
+summary(tune.out)
+(bestmod <- tune.out$best.model)
+summary(bestmod)
 ```
 
 ```{r svm-accuracy}
@@ -420,10 +421,12 @@ Points that are represented by an “X” are the support vectors, or the points
 
 ```{r svm-radial-tune}
 # find optimal cost of misclassification
-tune.out <- tune(svm, LeadStatus~., kernel = "radial", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges = list(cost = 10^(-2:1),gamma=10^(-2:1)), probability=TRUE)
+tune.out <- tune(svm, LeadStatus~., kernel = "radial", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.1 ,1 ,10 ,100 ,1000),
+gamma=c(0.5,1,2,3,4)), probability=TRUE)
 # extract the best model
 summary(tune.out)
 (bestmod <- tune.out$best.model)
+summary(bestmod)
 ```
 
 ```{r svm-radial-accuracy}
@@ -467,9 +470,75 @@ plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
 abline(0,1)
 
 # write for kaggle prediction 
-write.csv(test,"Predictions/svm-prediction.csv",row.names=FALSE)
+write.csv(test,"Predictions/svm-radial-prediction.csv",row.names=FALSE)
 ```
 
+### Polynomial
+```{r svm-poly}
+set.seed(1)
+svmfit <- svm(LeadStatus~., kernel = "poly",degree=2,data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE)
+summary(svmfit)
+```
+
+```{r plot-svm-poly-model}
+plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE)
+plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE)
+```
+Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line. 
+
+```{r svm-poly-tune}
+# find optimal cost of misclassification
+tune.out <- tune(svm, LeadStatus~., kernel = "poly", degree=2, data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.1 ,1 ,10 ,100 ,1000),
+gamma=c(0.5,1,2,3,4)), probability=TRUE)
+# extract the best model
+summary(tune.out)
+(bestmod <- tune.out$best.model)
+summary(bestmod)
+```
+
+```{r svm-poly-accuracy}
+dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE)
+table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3)
+
+# accuracy rate
+mean(dev.svm.pred == combined.dev$LeadStatus)
+
+# error rate
+mean(dev.svm.pred != combined.dev$LeadStatus)
+```
+
+```{r roc-curve-svm-poly}
+# ROC curves
+probabilities = attr(dev.svm.pred, "probabilities")
+prediction(probabilities[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot()
+
+# AUC
+prediction(probabilities[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "auc") %>%
+  .@y.values
+
+# Cross-entropy 
+prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
+  performance(measure = "mxe") %>%
+  .@y.values
+```
+
+```{r write-svm-poly-result}
+test=E_df
+test.svm.pred = predict(svmfit, newdata = test, probability=TRUE)
+probabilities = attr(test.svm.pred, "probabilities")
+test$LeadStatus = probabilities[,1]
+test = test[,c("AssessmentiD","LeadStatus")]
+
+# compare to logistic regression
+plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
+abline(0,1)
+
+# write for kaggle prediction 
+write.csv(test,"Predictions/svm-poly2-prediction.csv",row.names=FALSE)
+```
 
 
 ## xgboost 
