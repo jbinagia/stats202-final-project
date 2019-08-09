@@ -197,8 +197,8 @@ write.csv(test.output,"test.nb.csv",row.names=FALSE)
 The naive classifier doesn't do great on our holdout test data. The total development AUC is $0.77$ but the false and true positive rates are high.
 
 ## Logistic 
+### Training - validation split 
 We might try a logistic regression. However, Study E has no country of UK, so we take out the country as a predictor. 
-
 ```{r logistic}
 library(pROC)
 names(combined.train)
@@ -234,8 +234,32 @@ It looks like PANSS_Total, VisitDay, Study, TxGroup, and some countries are stat
 plot(test.output.glm$LeadStatus,nb.predictions_df$Flagged,xlim=c(0,0.5),ylim=c(0,0.5))
 abline(0,1)
 ```
+### Full training set 
+```{r full-logistic}
+full.glm=glm(LeadStatus~.,data=combined_df[,-1],family=binomial)
+summary(full.glm)
+contrasts(LeadStatus)#check dummy encoding for Up/Down
+```
+
+```{r full-log-test-set}
+test=E_df
+glm.probs=predict(full.glm,test,type="response")#compute predictions based on fit for each observation; 1 corresponds to Passed
+glm.probs.flag=1-glm.probs#probabililty of being flagged for all.
+test.full.glm=as.data.frame(test$AssessmentiD)
+test.full.glm$LeadStatus=glm.probs.flag
+colnames(test.full.glm)[colnames(test.full.glm)=="AssessmentiD"] <- "AssessmentID"
+write.csv(test.full.glm,"Predictions/test.glm.full.csv",row.names=FALSE)
+
+```
+
+```{r similarity-of-training-and-full}
+plot(test.full.glm$LeadStatus,test.output.glm$LeadStatus)
+abline(0,1)
+```
+
 
 ## LDA
+### Training - validation split 
 Study E has no country of UK, so we take out the country as a predictor. 
 ```{r lda-start}
 library(MASS)       # provides LDA & QDA model functions
@@ -274,6 +298,7 @@ prediction(dev.lda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed",
 ```
 
 ```{r write-lda-result}
+test=E_df
 test.lda.pred = predict(lda.m1, newdata = test)
 test$LeadStatus = test.lda.pred$posterior[,1]
 test = test[,c("AssessmentiD","LeadStatus")]
@@ -285,11 +310,30 @@ abline(0,1)
 # write for kaggle prediction 
 write.csv(test,"Predictions/lda-prediction.csv",row.names=FALSE)
 ```
+### Use full training set  
+```{r lda-full}
+(lda.full = lda(LeadStatus~., data = combined_df[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")]))
+plot(lda.full)
+```
+
+```{r write-lda-full-result}
+test=E_df
+test.lda.pred = predict(lda.full, newdata = test)
+test$LeadStatus = test.lda.pred$posterior[,1]
+test = test[,c("AssessmentiD","LeadStatus")]
+
+# compare to logistic regression
+plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
+abline(0,1)
+
+# write for kaggle prediction 
+write.csv(test,"Predictions/lda-full-prediction.csv",row.names=FALSE)
+```
+
 
 
 
 ## QDA
-I would like to try QDA but it was giving me errors. 
 ```{r qda-start}
 (qda.m1 = qda(LeadStatus~., data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")]))
 ```
