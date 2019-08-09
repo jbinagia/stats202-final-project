@@ -347,9 +347,10 @@ summary(svmfit)
 ```
 
 ```{r plot-svm-model}
-plot.svm(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment") )
-plot.svm(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control") )
+plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE)
+plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE)
 ```
+Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line. 
 
 ```{r svm-tune}
 # find optimal cost of misclassification
