@@ -697,12 +697,12 @@ Now the logloss gets slightly better.
 Let's try tuning the parameters: ntrees, max_depth, min_rows, learn_rate, learn_rate_annealing, sample_rate, col_sample_rate. To speed this up, we'll use the development set for validation: 
 ```{r tuning}
 hyper_grid=list(
-  max_depth = c(2, 3, 5, 7), # > 1 for sure
-  min_rows = c(1, 10, 20),
-  learn_rate = c(0.001, 0.01, 0.1, 1),
+  max_depth = c(3, 4, 5), # 2 < and < 6 
+  min_rows = c(10, 20, 30, 40),
+  learn_rate = c(0.0025, 0.005, 0.01, 0.05), # > 0.001 and < 0.1
   learn_rate_annealing = c(1), # 1 is best
-  sample_rate = c(.5, .75, 1),
-  col_sample_rate = c(0.7,.8, .9, 1)
+  sample_rate = c(.65, .7,0.75,.8,.85), # > 0.6 and < 0.9
+  col_sample_rate = c(0.6, 0.7,.8, .9) # > 0.6 and < 1
 )
 search_criteria=list(
   strategy="RandomDiscrete",
@@ -740,13 +740,15 @@ getPredict = function(model.h2o,test_df,file.output){
   test.h2o = test_df %>%
   mutate_if(is.factor,factor,ordered = FALSE)%>%
   as.h2o()
+  #str(test.h2o)
 
-pred = h2o.predict(model.h2o,test.h2o)
-pred_df = as.data.frame(pred)
-test_df$LeadStatus = pred_df$Flagged
-test.output = test_df[,c("AssessmentiD","LeadStatus")]
-write.csv(test.output,file.output,row.names = FALSE)
+  pred = h2o.predict(model.h2o,test.h2o) #error!!!
+  pred_df = as.data.frame(pred)
+  test_df$LeadStatus = pred_df$Flagged
+  test.output = test_df[,c("AssessmentiD","LeadStatus")]
+  write.csv(test.output,file.output,row.names = FALSE)
 }
+test=E_df # study E is the test set 
 getPredict(best_model.random.discrete,test,"Predictions/test.gbm.csv")
 ```
 
