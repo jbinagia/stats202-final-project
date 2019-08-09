@@ -659,6 +659,7 @@ write.csv(test,"Predictions/svm-poly2-prediction.csv",row.names=FALSE)
 ## Gradient Boosting 
 ```{r h2o}
 #h2o.no_progress()
+h2o.removeAll()
 h2o.init(max_mem_size="4g")
 Y.train = "LeadStatus"
 X.train = setdiff(names(combined.train),c(Y.train,"Country"))
