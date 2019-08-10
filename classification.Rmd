@@ -733,6 +733,28 @@ summary(grid_perf)
 getROC.h2o(best_model.random.discrete,combined.dev.h2o.gbm)
 ```
 
+```{r evaluate-gbm}
+# train final model
+h2o.final <- h2o.gbm(
+  x = X.train,
+  y = Y.train,
+  training_frame = combined.train.h2o.gbm,
+  ntrees = 20000,
+  learn_rate = 0.01,
+  learn_rate_annealing = 1,
+  max_depth = 4,
+  min_rows = 30,
+  sample_rate = 0.75,
+  col_sample_rate = 0.9,
+  stopping_rounds = 10,
+  seed = 1
+)
+
+# model stopped after xx trees
+h2o.final@parameters$ntrees
+h2o.varimp_plot(h2o.final, num_of_features = 5) 
+```
+
 Let's predict the Kaggle test set:
 ```{r test}
 # predict values with predict , make a function to use easily every time
