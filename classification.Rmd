@@ -77,7 +77,7 @@ E_df = subset(E_init_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,Assessm
 names(E_df)
 ```
 
-Combine studies
+Combine the studies into one dataframe. 
 ```{r combine-studies}
 combined_df = rbind(A_df,B_df,C_df,D_df)
 summary(combined_df)
@@ -202,61 +202,126 @@ We might try a logistic regression. However, Study E has no country of UK, so we
 ```{r logistic}
 library(pROC)
 names(combined.train)
-combined.train.glm=combined.train[,-1] # exclude country from being a predictor 
+combined.train.glm = combined.train[,-1] # exclude country from being a predictor 
 attach(combined.train.glm)
 names(combined.train.glm)
-train.glm=glm(LeadStatus~.,data=combined.train.glm,family=binomial)
+train.glm = glm(LeadStatus~.,data = combined.train.glm,family = binomial)
 summary(train.glm)
 contrasts(LeadStatus)#check dummy encoding for Up/Down
 
 #dev test
-glm.probs.flag.dev=1-predict(train.glm,combined.dev,type="response")
-glm.pred=rep("Passed",dim(combined.dev)[1])#create vector of predictions of length the same as dev dataset
-glm.pred[glm.probs.flag.dev>0.2]="Flagged"#change relevant values to "Flagged" based on model-predicted value.
+glm.probs.flag.dev = 1-predict(train.glm,combined.dev,type = "response")
+glm.pred = rep("Passed",dim(combined.dev)[1])#create vector of predictions of length the same as dev dataset
+glm.pred[glm.probs.flag.dev>0.2] = "Flagged"#change relevant values to "Flagged" based on model-predicted value.
 table(glm.pred,combined.dev$LeadStatus)
-roc.dev=roc(LeadStatus~glm.probs.flag.dev,data=combined.dev)
-plot(roc.dev,xlim=c(0,1),ylim=c(0,1))
+roc.dev = roc(LeadStatus~glm.probs.flag.dev,data = combined.dev)
+plot(roc.dev,xlim = c(0,1),ylim = c(0,1))
 
 #kaggle test
-test=E_df
-glm.probs=predict(train.glm,test,type="response")#compute predictions based on fit for each observation; 1 corresponds to Passed
-glm.probs.flag=1-glm.probs#probabililty of being flagged for all.
+test = E_df
+glm.probs = predict(train.glm,test,type = "response")#compute predictions based on fit for each observation; 1 corresponds to Passed
+glm.probs.flag = 1-glm.probs#probabililty of being flagged for all.
 names(test)
-test.output.glm=as.data.frame(test$AssessmentiD)
-test.output.glm$LeadStatus=glm.probs.flag
+test.output.glm = as.data.frame(test$AssessmentiD)
+test.output.glm$LeadStatus = glm.probs.flag
 colnames(test.output.glm)[colnames(test.output.glm)=="AssessmentiD"] <- "AssessmentID"
-write.csv(test.output.glm,"Predictions/test.glm.csv",row.names=FALSE)
+write.csv(test.output.glm,"Predictions/test.glm.csv",row.names = FALSE)
 
 ```
 It looks like PANSS_Total, VisitDay, Study, TxGroup, and some countries are statistically significant predictors of Passed vs Flagged. 
 
 ```{r similarity}
-plot(test.output.glm$LeadStatus,nb.predictions_df$Flagged,xlim=c(0,0.5),ylim=c(0,0.5))
+plot(test.output.glm$LeadStatus,nb.predictions_df$Flagged,xlim = c(0,0.5),ylim = c(0,0.5))
 abline(0,1)
 ```
+
 ### Full training set 
 ```{r full-logistic}
-full.glm=glm(LeadStatus~.,data=combined_df[,-1],family=binomial)
+full.glm = glm(LeadStatus~.,data = combined_df[,-1],family = binomial)
 summary(full.glm)
 contrasts(LeadStatus)#check dummy encoding for Up/Down
 ```
 
 ```{r full-log-test-set}
-test=E_df
-glm.probs=predict(full.glm,test,type="response")#compute predictions based on fit for each observation; 1 corresponds to Passed
-glm.probs.flag=1-glm.probs#probabililty of being flagged for all.
-test.full.glm=as.data.frame(test$AssessmentiD)
-test.full.glm$LeadStatus=glm.probs.flag
+test = E_df
+glm.probs = predict(full.glm,test,type = "response") #compute predictions based on fit for each observation; 1 corresponds to Passed
+glm.probs.flag = 1 - glm.probs#probabililty of being flagged for all.
+test.full.glm = as.data.frame(test$AssessmentiD)
+test.full.glm$LeadStatus = glm.probs.flag
 colnames(test.full.glm)[colnames(test.full.glm)=="AssessmentiD"] <- "AssessmentID"
-write.csv(test.full.glm,"Predictions/test.glm.full.csv",row.names=FALSE)
-
+write.csv(test.full.glm,"Predictions/test.glm.full.csv",row.names = FALSE)
 ```
 
 ```{r similarity-of-training-and-full}
 plot(test.full.glm$LeadStatus,test.output.glm$LeadStatus)
 abline(0,1)
 ```
+### Logistic regression (all individual scores)
+```{r include scores}
+combined.all = rbind(A_init_df, B_init_df, C_init_df, D_init_df)
+combined.all = subset(combined.all,select = setdiff(names(combined.all),c("Country","Study","PatientID","RaterID","AssessmentiD","PANSS_Total","SiteID")))
+names(combined.all)
+combined.all = distinct(combined.all)
+combined.all <- mutate_at(combined.all, vars(TxGroup,LeadStatus), as.factor)
+# str(combined.all) # compactly display structure of the object 
 
+E_df<-mutate_at(E_df,vars(Country, TxGroup,AssessmentiD),as.factor)
+# str(E_df)
+combined.all$LeadStatus[combined.all$LeadStatus!="Passed"]<-"Flagged"
+combined.all$LeadStatus = factor(combined.all$LeadStatus)
+table(combined.all$LeadStatus) # how many passed vs. not 
+
+set.seed(1)
+tot = 1:dim(combined.all)[1] # total number of observations 
+
+train = sample(tot,length(tot)*0.7) # put 70% of observations into training set 
+combined.train.all = combined.all[train,]
+head(combined.train.all) # visually check data frame 
+
+dev = tot[-train] # rest go into development set 
+combined.dev.all = combined.all[dev,]
+test.all = E_df # study E is the test set 
+```
+
+```{r logistic-all-predictors}
+model1 <- glm(LeadStatus ~., family = "binomial", data = combined.train.all)
+summary(model1)
+```
+
+```{r more-log-all-pred-evaluation}
+library(broom)      # helps to tidy up model outputs
+tidy(model1)
+caret::varImp(model1)
+```
+
+# ```{r log-all-pred-predict}
+# dev.log.all.pred = predict(model1, newdata = combined.dev.all, type="response")
+# table(combined.dev.all$LeadStatus, dev.log.all.pred) %>% prop.table() %>% round(3)
+# 
+# # accuracy rate
+# mean(dev.log.all.pred == combined.dev.all$LeadStatus)
+# 
+# # error rate
+# mean(dev.log.all.pred != combined.dev.all$LeadStatus)
+# ```
+# 
+# ```{r roc-curve}
+# # ROC curves
+# library(ROCR)
+# prediction(dev.log.all.pred$posterior[,2], combined.dev.all$LeadStatus) %>%
+#   performance(measure = "tpr", x.measure = "fpr") %>%
+#   plot()
+# 
+# # AUC
+# prediction(dev.log.all.pred$posterior[,2], combined.dev.all$LeadStatus) %>%
+#   performance(measure = "auc") %>%
+#   .@y.values
+# 
+# # Cross-entropy 
+# prediction(dev.log.all.pred$posterior[,2], ifelse(combined.dev.all$LeadStatus=="Passed", 1, 0)) %>%
+#   performance(measure = "mxe") %>%
+#   .@y.values
+# ```
 
 ## LDA
 ### Training - validation split 
@@ -332,6 +397,8 @@ write.csv(test,"Predictions/lda-full-prediction.csv",row.names=FALSE)
 
 
 
+
+### Use all predictors
 
 ## QDA
 ```{r qda-start}
@@ -775,37 +842,6 @@ getPredict(best_model.random.discrete,test,"Predictions/test.gbm.csv")
 ```
 
 Maybe including all the individual scores would help. 
-```{r include scores}
-# A_df = read.csv("Data/Study_A.csv")
-# B_df = read.csv("Data/Study_B.csv")
-# C_df = read.csv("Data/Study_C.csv")
-# D_df = read.csv("Data/Study_D.csv")
-# E_df = read.csv("Data/Study_E.csv")
-combined.all = rbind(A_init_df, B_init_df, C_init_df, D_init_df)
-combined.all = subset(combined.all,select = setdiff(names(combined.all),c("Country","Study","PatientID","RaterID","AssessmentiD","PANSS_Total","SiteID")))
-names(combined.all)
-combined.all = distinct(combined.all)
-combined.all <- mutate_at(combined.all, vars(TxGroup,LeadStatus), as.factor)
-str(combined.all) # compactly display structure of the object 
-
-E_df<-mutate_at(E_df,vars(Country, TxGroup,AssessmentiD),as.factor)
-str(E_df)
-combined_df$LeadStatus[combined_df$LeadStatus!="Passed"]<-"Flagged"
-combined_df$LeadStatus = factor(combined_df$LeadStatus)
-table(combined_df$LeadStatus)
-
-set.seed(1)
-tot = 1:dim(combined.all)[1] # total number of observations 
-
-train = sample(tot,length(tot)*0.7) # put 70% of observations into training set 
-combined.train.all = combined.all[train,]
-head(combined.train.all)
-
-dev = tot[-train] # rest go into development set 
-combined.dev.all = combined.all[dev,]
-test.all = E_df # study E is the test set 
-```
-
 ```{r gbm with all}
 Y.train = "LeadStatus"
 X.train = setdiff(names(combined.train.all),c(Y.train,"Country"))
