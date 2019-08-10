@@ -220,7 +220,7 @@ test_df$VisitDay = test_df$VisitDay + 7
 Note that as a baseline we use the most recent `PANSS_Total` score as a baseline prediction from which to compare other groups to. 
 ```{r naive}
 # create "Naive" submission 
-write.csv(select_patients_df[,c("PatientID","PANSS_Total")],'naive-forecast.csv',row.names=FALSE)
+write.csv(select_patients_df[,c("PatientID","PANSS_Total")],'Predictions/naive-forecast.csv',row.names=FALSE)
 ```
 
 How can we improve upon this simple model? First let's examine the distribution of scores in study E vs. the other studies. 
@@ -295,12 +295,12 @@ for (id in naive_df$PatientID) { # for each unique id
 }
 
 # create submission script
-write.csv(naive_df[,c("PatientID","PANSS_Total")],'less-naive-forecast.csv',row.names=FALSE)
+write.csv(naive_df[,c("PatientID","PANSS_Total")],'Predictions/less-naive-forecast.csv',row.names=FALSE)
 ```
+Simply averaging the final two days performs quite poorly on the test set (public leaderboard on Kaggle). 
 
 We can repeat this process, now storing data for the third day. 
 ```{r find-data-third-to-last-day}
-
 # find third to last visit day 
 for (id in naive_df$PatientID) { # for each unique id
   sub_df = subset(E_df, PatientID==id)
@@ -331,7 +331,7 @@ for (id in naive_df$PatientID) { # for each unique id
 ```
 
 To weigh historical data that does not follow a strong trend (i.e. the patient scores towards the end of the study), we can use the idea of exponential smoothing (http://uc-r.github.io/ts_exp_smoothing). 
-```{r combine-time-history}
+```{r exponential-smoothing}
 naive_df$PANSS_Total = 0*naive_df$PANSS_Total
 for (id in naive_df$PatientID) { # for each unique id
   day = as.integer(naive_df[naive_df$PatientID == id,"SecondToLastDay"])
@@ -350,9 +350,88 @@ for (id in naive_df$PatientID) { # for each unique id
 }
 
 # create submission script
-write.csv(naive_df[,c("PatientID","PANSS_Total")],'less-naive-forecast.csv',row.names=FALSE)
+write.csv(naive_df[,c("PatientID","PANSS_Total")],'Predictions/less-naive-forecast.csv',row.names=FALSE)
+```
+Note that we are justified at truncating at three days for $\alpha = 0.8$ since then we incur a $0.8*(0.2)^4*100 = 0.128\%$ error. 
+
+We can also explore just only looking at the two most recent days: 
+```{r just-two-days}
+naive_df$PANSS_Total = 0*naive_df$PANSS_Total
+for (id in naive_df$PatientID) { # for each unique id
+  day = as.integer(naive_df[naive_df$PatientID == id,"SecondToLastDay"])
+  if (is.na(day)){
+    naive_df[naive_df$PatientID == id,"PANSS_Total"] = naive_df[naive_df$PatientID == id,"FinalScore"]
+  }else{
+    day2 = as.integer(naive_df[naive_df$PatientID == id,"ThirdToLastDay"])
+      alpha = 0.9
+      naive_df[naive_df$PatientID == id,"PANSS_Total"] = alpha*naive_df[naive_df$PatientID == id,"FinalScore"] + alpha*(1-alpha)*naive_df[naive_df$PatientID == id,"SecondToLastScore"]
+  }
+}
+
+# create submission script
+write.csv(naive_df[,c("PatientID","PANSS_Total")],'Predictions/two-prev-days-forecast.csv',row.names=FALSE)
+```
+Note that we are justified at truncating at two days for $\alpha = 0.9$ since then we incur a $0.9*(0.1)^3*100 = 0.09\%$ error. 
+
+Finally, what happens if we include the most recent four days? 
+```{r find-data-fourth-to-last-day}
+# find fourth to last visit day 
+for (id in naive_df$PatientID) { # for each unique id
+  sub_df = subset(E_df, PatientID==id)
+  x = sub_df$VisitDay
+  n <- length(x)
+  if (n<4) {
+    naive_df[naive_df$PatientID == id,"FourthToLastDay"] = NA
+  }else{
+    naive_df[naive_df$PatientID == id,"FourthToLastDay"] = sort(x,partial=n-3)[n-3]
+  }
+}
+
+# find fourth to last score 
+naive_df$FourthToLastScore = as.numeric(naive_df$FinalScore)
+for (id in naive_df$PatientID) { # for each unique id
+  day = as.integer(naive_df[naive_df$PatientID == id,"FourthToLastDay"])
+  if (is.na(day)){
+    naive_df[naive_df$PatientID == id,"FourthToLastScore"] = NA
+  }else{
+    sub_df = subset(E_df, PatientID==id & VisitDay==day)
+    if (dim(sub_df)[1] > 1){ # take simple average in this case
+      naive_df[naive_df$PatientID == id,"FourthToLastScore"] = mean(sub_df$PANSS_Total)
+    }else{
+      naive_df[naive_df$PatientID == id,"FourthToLastScore"] = sub_df$PANSS_Total
+    }
+  }
+}
 ```
 
+```{r exp-smooth-4-days}
+naive_df$PANSS_Total = 0*naive_df$PANSS_Total
+for (id in naive_df$PatientID) { # for each unique id
+  day = as.integer(naive_df[naive_df$PatientID == id,"SecondToLastDay"])
+  if (is.na(day)){
+    naive_df[naive_df$PatientID == id,"PANSS_Total"] = naive_df[naive_df$PatientID == id,"FinalScore"]
+  }else{
+    day2 = as.integer(naive_df[naive_df$PatientID == id,"ThirdToLastDay"])
+    if (is.na(day2)){
+      alpha = 0.9
+      naive_df[naive_df$PatientID == id,"PANSS_Total"] = alpha*naive_df[naive_df$PatientID == id,"FinalScore"] + alpha*(1-alpha)*naive_df[naive_df$PatientID == id,"SecondToLastScore"]
+    }else{
+      day3 = as.integer(naive_df[naive_df$PatientID == id,"FourthToLastDay"])
+      if (is.na(day3)){
+      alpha = 0.8
+      naive_df[naive_df$PatientID == id,"PANSS_Total"] = alpha*naive_df[naive_df$PatientID == id,"FinalScore"] + alpha*(1-alpha)*naive_df[naive_df$PatientID == id,"SecondToLastScore"]  + alpha*(1-alpha)^2*naive_df[naive_df$PatientID == id,"ThirdToLastScore"]
+      }else{
+      alpha = 0.7
+      naive_df[naive_df$PatientID == id,"PANSS_Total"] =     alpha*naive_df[naive_df$PatientID == id,"FinalScore"] + alpha*(1-alpha)*naive_df[naive_df$PatientID == id,"SecondToLastScore"]  + alpha*(1-alpha)^2*naive_df[naive_df$PatientID == id,"ThirdToLastScore"] + alpha*(1-alpha)^3*naive_df[naive_df$PatientID == id,"FourthToLastScore"]
+      }
+    }
+  }
+}
+
+# create submission script
+write.csv(naive_df[,c("PatientID","PANSS_Total")],'Predictions/4-day-naive-forecast.csv',row.names=FALSE)
+```
+Note that we are justified at truncating at two days for $\alpha = 0.7$ since then we incur a $0.7*0.3^4*100 = 0.567\%$ error. 
 
 ### Create training set
 ```{r remove-test-from-total}
