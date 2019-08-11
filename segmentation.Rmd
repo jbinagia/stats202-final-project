@@ -103,9 +103,8 @@ summary(scaled_df)
 
 ## Deciding on a clustering algorithm 
 ```{r choosing}
-cvalid.out = clValid(scaled_df, maxitems = 3000, nClust = 2:8, 
-                     clMethods = c("kmeans","pam"), validation = c("internal", "stability"))
-summary(cvalid.out)
+#cvalid.out = clValid(scaled_df, maxitems = 3000, nClust = 2:8, clMethods = c("kmeans","pam"), validation = c("internal", "stability"))
+#summary(cvalid.out)
 ```
 We can save time by only running this cell once and loading the results otherwise: ![clValid results](Figures/clustering-results.png)
 
@@ -153,7 +152,7 @@ km.out$withinss # within-cluster sum of squares
 km.out$size # cluster size
 
 # visualize
-fviz_cluster(km.out, scaled_df,geom = c("point"))
+fviz_cluster(km.out, scaled_df,geom = c("point")) + theme_minimal() + labs(title ="")
 ```
 
 ## Pam clustering
@@ -185,7 +184,7 @@ As for K-means, we only compute the gap statistic when needed. Otherwise it is c
 ```{r pam}
 pam.res <- pam(scaled_df, chosen_k)
  # Visualize pam clustering
-fviz_cluster(pam.res, geom = "point")
+fviz_cluster(pam.res, geom = "point") + theme_minimal() + labs(title ="")
 ```
 
 
