@@ -33,6 +33,13 @@ knitr::opts_chunk$set(echo = TRUE)
   - The development dataset will be the other 30% of that.
   - The test dataset for kaggle will be study E, for which we have no LeadStatus. 
   
+### Notes
+  - random forests vs gbm
+    - https://stats.stackexchange.com/questions/173390/gradient-boosting-tree-vs-random-forest
+    - https://medium.com/@aravanshad/gradient-boosting-versus-random-forest-cfa3fa8f0d80
+    - http://fastml.com/what-is-better-gradient-boosted-trees-or-random-forest/
+    - random forests easier to tune but usually on par if not slightly worse than gbm
+  
 
 # Thoughts/Conclusions
 
@@ -132,8 +139,7 @@ library(corrplot)
 Y.train="LeadStatus"
 X.train=setdiff(names(combined.train),c(Y.train,"VisitDay"))
 
-#names(X.train)
-h2o.no_progress()
+# h2o.no_progress()
 h2o.init()
 
 combined.train.h2o <- combined.train %>%
@@ -253,11 +259,12 @@ write.csv(test.full.glm,"Predictions/test.glm.full.csv",row.names = FALSE)
 ```
 
 ```{r similarity-of-training-and-full}
-plot(test.full.glm$LeadStatus,test.output.glm$LeadStatus)
+plot(test.output.glm$LeadStatus,test.full.glm$LeadStatus)
 abline(0,1)
 ```
 ### Logistic regression (all individual scores)
 ```{r include scores}
+# create dataframe that has all individual PANSS scores
 combined.all = rbind(A_init_df, B_init_df, C_init_df, D_init_df)
 combined.all = subset(combined.all,select = setdiff(names(combined.all),c("Country","Study","PatientID","RaterID","AssessmentiD","PANSS_Total","SiteID")))
 names(combined.all)
@@ -265,12 +272,14 @@ combined.all = distinct(combined.all)
 combined.all <- mutate_at(combined.all, vars(TxGroup,LeadStatus), as.factor)
 # str(combined.all) # compactly display structure of the object 
 
-E_df<-mutate_at(E_df,vars(Country, TxGroup,AssessmentiD),as.factor)
-# str(E_df)
+
+# fix up LeadStatus column for the purposes of part 4 
 combined.all$LeadStatus[combined.all$LeadStatus!="Passed"]<-"Flagged"
 combined.all$LeadStatus = factor(combined.all$LeadStatus)
 table(combined.all$LeadStatus) # how many passed vs. not 
 
+
+# split into training and dev set
 set.seed(1)
 tot = 1:dim(combined.all)[1] # total number of observations 
 
@@ -280,7 +289,12 @@ head(combined.train.all) # visually check data frame
 
 dev = tot[-train] # rest go into development set 
 combined.dev.all = combined.all[dev,]
-test.all = E_df # study E is the test set 
+
+
+# create test set that has all individual scores
+E_df_tmp = subset(E_init_df,select = setdiff(names(E_init_df),c("Country","Study","PatientID","RaterID","PANSS_Total","SiteID")))
+E_df_tmp = mutate_at(E_df_tmp,vars(TxGroup,AssessmentiD),as.factor)
+test.all = E_df_tmp # study E is the test set 
 ```
 
 ```{r logistic-all-predictors}
@@ -293,35 +307,6 @@ library(broom)      # helps to tidy up model outputs
 tidy(model1)
 caret::varImp(model1)
 ```
-
-# ```{r log-all-pred-predict}
-# dev.log.all.pred = predict(model1, newdata = combined.dev.all, type="response")
-# table(combined.dev.all$LeadStatus, dev.log.all.pred) %>% prop.table() %>% round(3)
-# 
-# # accuracy rate
-# mean(dev.log.all.pred == combined.dev.all$LeadStatus)
-# 
-# # error rate
-# mean(dev.log.all.pred != combined.dev.all$LeadStatus)
-# ```
-# 
-# ```{r roc-curve}
-# # ROC curves
-# library(ROCR)
-# prediction(dev.log.all.pred$posterior[,2], combined.dev.all$LeadStatus) %>%
-#   performance(measure = "tpr", x.measure = "fpr") %>%
-#   plot()
-# 
-# # AUC
-# prediction(dev.log.all.pred$posterior[,2], combined.dev.all$LeadStatus) %>%
-#   performance(measure = "auc") %>%
-#   .@y.values
-# 
-# # Cross-entropy 
-# prediction(dev.log.all.pred$posterior[,2], ifelse(combined.dev.all$LeadStatus=="Passed", 1, 0)) %>%
-#   performance(measure = "mxe") %>%
-#   .@y.values
-# ```
 
 ## LDA
 ### Training - validation split 
@@ -449,285 +434,277 @@ write.csv(test,"Predictions/qda-prediction.csv",row.names=FALSE)
 ```
 
 ## SVM
-### Linear
-```{r svm-intro232213213}
-library(e1071)        # SVM methodology
-set.seed(1)
+<!-- ### Linear -->
+<!-- ```{r svm-intro232213213} -->
+<!-- library(e1071)        # SVM methodology -->
+<!-- set.seed(1) -->
 
-svmfit <- svm(LeadStatus~., kernel = "linear",data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE)
-summary(svmfit)
-```
+<!-- svmfit <- svm(LeadStatus~., kernel = "linear",data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE) -->
+<!-- summary(svmfit) -->
+<!-- ``` -->
 
-```{r plot-svm-model12321}
-plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE)
-plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE)
-```
-Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line. 
+<!-- ```{r plot-svm-model12321} -->
+<!-- plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE) -->
+<!-- plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE) -->
+<!-- ``` -->
+<!-- Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line.  -->
 
-```{r svm-tune123213}
-# # find optimal cost of misclassification
-# tune.out <- tune(svm, LeadStatus~., kernel = "linear", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100)), probability=TRUE)
-# # extract the best model
-# summary(tune.out)
-# (bestmod <- tune.out$best.model)
-# summary(bestmod)
-```
+<!-- ```{r svm-tune123213} -->
+<!-- # # find optimal cost of misclassification -->
+<!-- # tune.out <- tune(svm, LeadStatus~., kernel = "linear", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100)), probability=TRUE) -->
+<!-- # # extract the best model -->
+<!-- # summary(tune.out) -->
+<!-- # (bestmod <- tune.out$best.model) -->
+<!-- # summary(bestmod) -->
+<!-- ``` -->
 
-```{r svm-accuracy123213}
-dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE)
-table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3)
+<!-- ```{r svm-accuracy123213} -->
+<!-- dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE) -->
+<!-- table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3) -->
 
-# accuracy rate
-mean(dev.svm.pred == combined.dev$LeadStatus)
+<!-- # accuracy rate -->
+<!-- mean(dev.svm.pred == combined.dev$LeadStatus) -->
 
-# error rate
-mean(dev.svm.pred != combined.dev$LeadStatus)
-```
+<!-- # error rate -->
+<!-- mean(dev.svm.pred != combined.dev$LeadStatus) -->
+<!-- ``` -->
 
-```{r roc-curve-svm123213}
-# ROC curves
-probabilities = attr(dev.svm.pred, "probabilities")
-prediction(probabilities[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "tpr", x.measure = "fpr") %>%
-  plot()
+<!-- ```{r roc-curve-svm123213} -->
+<!-- # ROC curves -->
+<!-- probabilities = attr(dev.svm.pred, "probabilities") -->
+<!-- prediction(probabilities[,2], combined.dev$LeadStatus) %>% -->
+<!--   performance(measure = "tpr", x.measure = "fpr") %>% -->
+<!--   plot() -->
 
-# AUC
-prediction(probabilities[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "auc") %>%
-  .@y.values
+<!-- # AUC -->
+<!-- prediction(probabilities[,2], combined.dev$LeadStatus) %>% -->
+<!--   performance(measure = "auc") %>% -->
+<!--   .@y.values -->
 
-# Cross-entropy 
-prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
-  performance(measure = "mxe") %>%
-  .@y.values
-```
+<!-- # Cross-entropy  -->
+<!-- prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>% -->
+<!--   performance(measure = "mxe") %>% -->
+<!--   .@y.values -->
+<!-- ``` -->
 
-```{r write-svm-result123213}
-test=E_df
-test.svm.pred = predict(svmfit, newdata = test, probability=TRUE)
-probabilities = attr(test.svm.pred, "probabilities")
-test$LeadStatus = probabilities[,1]
-test = test[,c("AssessmentiD","LeadStatus")]
+<!-- ```{r write-svm-result123213} -->
+<!-- test=E_df -->
+<!-- test.svm.pred = predict(svmfit, newdata = test, probability=TRUE) -->
+<!-- probabilities = attr(test.svm.pred, "probabilities") -->
+<!-- test$LeadStatus = probabilities[,1] -->
+<!-- test = test[,c("AssessmentiD","LeadStatus")] -->
 
-# compare to logistic regression
-plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
-abline(0,1)
+<!-- # compare to logistic regression -->
+<!-- plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5)) -->
+<!-- abline(0,1) -->
 
-# write for kaggle prediction 
-write.csv(test,"Predictions/svm-prediction.csv",row.names=FALSE)
-```
+<!-- # write for kaggle prediction  -->
+<!-- write.csv(test,"Predictions/svm-prediction.csv",row.names=FALSE) -->
+<!-- ``` -->
 
-### Linear (all PANSS scores)
-```{r recreate-data-frames}
+<!-- ### Linear (all PANSS scores) -->
+<!-- <!-- ```{r svm-intro} --> -->
+<!-- <!-- library(e1071)        # SVM methodology --> -->
+<!-- <!-- set.seed(1) --> -->
+<!-- <!-- svmfit <- svm(LeadStatus~., kernel = "linear",data = combined.train.all, scale=TRUE, probability=TRUE) --> -->
+<!-- <!-- summary(svmfit) --> -->
+<!-- <!-- ``` --> -->
+<!-- <!-- This is quite a lengthy computation for svm. Doesn't complete within 10 minutes on my desktop computer.  --> -->
 
-```
+<!-- <!-- ```{r svm-tune} --> -->
+<!-- <!-- # # find optimal cost of misclassification --> -->
+<!-- <!-- # tune.out <- tune(svm, LeadStatus~., kernel = "linear", data = combined.train.all, ranges =list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100)), probability=TRUE) --> -->
+<!-- <!-- # # extract the best model --> -->
+<!-- <!-- # summary(tune.out) --> -->
+<!-- <!-- # (bestmod <- tune.out$best.model) --> -->
+<!-- <!-- # summary(bestmod) --> -->
+<!-- <!-- ``` --> -->
 
-```{r svm-intro}
-set.seed(1)
-svmfit <- svm(LeadStatus~., kernel = "linear",data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE)
-summary(svmfit)
-```
+<!-- <!-- ```{r svm-accuracy} --> -->
+<!-- <!-- dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE) --> -->
+<!-- <!-- table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3) --> -->
 
-```{r plot-svm-model}
-plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE)
-plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE)
-```
-Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line. 
+<!-- <!-- # accuracy rate --> -->
+<!-- <!-- mean(dev.svm.pred == combined.dev$LeadStatus) --> -->
 
-```{r svm-tune}
-# # find optimal cost of misclassification
-# tune.out <- tune(svm, LeadStatus~., kernel = "linear", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.001 , 0.01, 0.1, 1,5,10,100)), probability=TRUE)
-# # extract the best model
-# summary(tune.out)
-# (bestmod <- tune.out$best.model)
-# summary(bestmod)
-```
+<!-- <!-- # error rate --> -->
+<!-- <!-- mean(dev.svm.pred != combined.dev$LeadStatus) --> -->
+<!-- <!-- ``` --> -->
 
-```{r svm-accuracy}
-dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE)
-table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3)
+<!-- <!-- ```{r roc-curve-svm} --> -->
+<!-- <!-- # ROC curves --> -->
+<!-- <!-- probabilities = attr(dev.svm.pred, "probabilities") --> -->
+<!-- <!-- prediction(probabilities[,2], combined.dev$LeadStatus) %>% --> -->
+<!-- <!--   performance(measure = "tpr", x.measure = "fpr") %>% --> -->
+<!-- <!--   plot() --> -->
 
-# accuracy rate
-mean(dev.svm.pred == combined.dev$LeadStatus)
+<!-- <!-- # AUC --> -->
+<!-- <!-- prediction(probabilities[,2], combined.dev$LeadStatus) %>% --> -->
+<!-- <!--   performance(measure = "auc") %>% --> -->
+<!-- <!--   .@y.values --> -->
 
-# error rate
-mean(dev.svm.pred != combined.dev$LeadStatus)
-```
+<!-- <!-- # Cross-entropy  --> -->
+<!-- <!-- prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>% --> -->
+<!-- <!--   performance(measure = "mxe") %>% --> -->
+<!-- <!--   .@y.values --> -->
+<!-- <!-- ``` --> -->
 
-```{r roc-curve-svm}
-# ROC curves
-probabilities = attr(dev.svm.pred, "probabilities")
-prediction(probabilities[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "tpr", x.measure = "fpr") %>%
-  plot()
+<!-- <!-- ```{r write-svm-result} --> -->
+<!-- <!-- test=E_df --> -->
+<!-- <!-- test.svm.pred = predict(svmfit, newdata = test, probability=TRUE) --> -->
+<!-- <!-- probabilities = attr(test.svm.pred, "probabilities") --> -->
+<!-- <!-- test$LeadStatus = probabilities[,1] --> -->
+<!-- <!-- test = test[,c("AssessmentiD","LeadStatus")] --> -->
 
-# AUC
-prediction(probabilities[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "auc") %>%
-  .@y.values
+<!-- <!-- # compare to logistic regression --> -->
+<!-- <!-- plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5)) --> -->
+<!-- <!-- abline(0,1) --> -->
 
-# Cross-entropy 
-prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
-  performance(measure = "mxe") %>%
-  .@y.values
-```
-
-```{r write-svm-result}
-test=E_df
-test.svm.pred = predict(svmfit, newdata = test, probability=TRUE)
-probabilities = attr(test.svm.pred, "probabilities")
-test$LeadStatus = probabilities[,1]
-test = test[,c("AssessmentiD","LeadStatus")]
-
-# compare to logistic regression
-plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
-abline(0,1)
-
-# write for kaggle prediction 
-write.csv(test,"Predictions/svm-all-pred-prediction.csv",row.names=FALSE)
-```
+<!-- <!-- # write for kaggle prediction  --> -->
+<!-- <!-- write.csv(test,"Predictions/svm-all-pred-prediction.csv",row.names=FALSE) --> -->
+<!-- <!-- ``` --> -->
 
 
-### Radial
-```{r svm-radial}
-set.seed(1)
-svmfit <- svm(LeadStatus~., kernel = "radial",data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE)
-summary(svmfit)
-```
+<!-- ### Radial -->
+<!-- ```{r svm-radial} -->
+<!-- set.seed(1) -->
+<!-- svmfit <- svm(LeadStatus~., kernel = "radial",data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE) -->
+<!-- summary(svmfit) -->
+<!-- ``` -->
 
-```{r plot-svm-radial-model}
-plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE)
-plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE)
-```
-Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line. 
+<!-- ```{r plot-svm-radial-model} -->
+<!-- plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE) -->
+<!-- plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE) -->
+<!-- ``` -->
+<!-- Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line.  -->
 
-```{r svm-radial-tune}
-# # find optimal cost of misclassification
-# tune.out <- tune(svm, LeadStatus~., kernel = "radial", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.1 ,1 ,10 ,100 ,1000),
-# gamma=c(0.5,1,2,3,4)), probability=TRUE)
-# # extract the best model
-# summary(tune.out)
-# (bestmod <- tune.out$best.model)
-# summary(bestmod)
-```
+<!-- ```{r svm-radial-tune} -->
+<!-- # # find optimal cost of misclassification -->
+<!-- # tune.out <- tune(svm, LeadStatus~., kernel = "radial", data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.1 ,1 ,10 ,100 ,1000), -->
+<!-- # gamma=c(0.5,1,2,3,4)), probability=TRUE) -->
+<!-- # # extract the best model -->
+<!-- # summary(tune.out) -->
+<!-- # (bestmod <- tune.out$best.model) -->
+<!-- # summary(bestmod) -->
+<!-- ``` -->
 
-```{r svm-radial-accuracy}
-dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE)
-table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3)
+<!-- ```{r svm-radial-accuracy} -->
+<!-- dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE) -->
+<!-- table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3) -->
 
-# accuracy rate
-mean(dev.svm.pred == combined.dev$LeadStatus)
+<!-- # accuracy rate -->
+<!-- mean(dev.svm.pred == combined.dev$LeadStatus) -->
 
-# error rate
-mean(dev.svm.pred != combined.dev$LeadStatus)
-```
+<!-- # error rate -->
+<!-- mean(dev.svm.pred != combined.dev$LeadStatus) -->
+<!-- ``` -->
 
-```{r roc-curve-svm-radial}
-# ROC curves
-probabilities = attr(dev.svm.pred, "probabilities")
-prediction(probabilities[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "tpr", x.measure = "fpr") %>%
-  plot()
+<!-- ```{r roc-curve-svm-radial} -->
+<!-- # ROC curves -->
+<!-- probabilities = attr(dev.svm.pred, "probabilities") -->
+<!-- prediction(probabilities[,2], combined.dev$LeadStatus) %>% -->
+<!--   performance(measure = "tpr", x.measure = "fpr") %>% -->
+<!--   plot() -->
 
-# AUC
-prediction(probabilities[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "auc") %>%
-  .@y.values
+<!-- # AUC -->
+<!-- prediction(probabilities[,2], combined.dev$LeadStatus) %>% -->
+<!--   performance(measure = "auc") %>% -->
+<!--   .@y.values -->
 
-# Cross-entropy 
-prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
-  performance(measure = "mxe") %>%
-  .@y.values
-```
+<!-- # Cross-entropy  -->
+<!-- prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>% -->
+<!--   performance(measure = "mxe") %>% -->
+<!--   .@y.values -->
+<!-- ``` -->
 
-```{r write-svm-radial-result}
-test=E_df
-test.svm.pred = predict(svmfit, newdata = test, probability=TRUE)
-probabilities = attr(test.svm.pred, "probabilities")
-test$LeadStatus = probabilities[,1]
-test = test[,c("AssessmentiD","LeadStatus")]
+<!-- ```{r write-svm-radial-result} -->
+<!-- test=E_df -->
+<!-- test.svm.pred = predict(svmfit, newdata = test, probability=TRUE) -->
+<!-- probabilities = attr(test.svm.pred, "probabilities") -->
+<!-- test$LeadStatus = probabilities[,1] -->
+<!-- test = test[,c("AssessmentiD","LeadStatus")] -->
 
-# compare to logistic regression
-plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
-abline(0,1)
+<!-- # compare to logistic regression -->
+<!-- plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5)) -->
+<!-- abline(0,1) -->
 
-# write for kaggle prediction 
-write.csv(test,"Predictions/svm-radial-prediction.csv",row.names=FALSE)
-```
+<!-- # write for kaggle prediction  -->
+<!-- write.csv(test,"Predictions/svm-radial-prediction.csv",row.names=FALSE) -->
+<!-- ``` -->
 
-### Polynomial
-```{r svm-poly}
-set.seed(1)
-svmfit <- svm(LeadStatus~., kernel = "poly",degree=2,data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE)
-summary(svmfit)
-```
+<!-- ### Polynomial -->
+<!-- ```{r svm-poly} -->
+<!-- set.seed(1) -->
+<!-- svmfit <- svm(LeadStatus~., kernel = "poly",degree=2,data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], scale=TRUE, probability=TRUE) -->
+<!-- summary(svmfit) -->
+<!-- ``` -->
 
-```{r plot-svm-poly-model}
-plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE)
-plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE)
-```
-Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line.
+<!-- ```{r plot-svm-poly-model} -->
+<!-- plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Treatment"), fill=FALSE) -->
+<!-- plot(svmfit,combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")],VisitDay~PANSS_Total,slice = list(TxGroup = "Control"), fill=FALSE) -->
+<!-- ``` -->
+<!-- Points that are represented by an “X” are the support vectors, or the points that directly affect the classification line. -->
 
-```{r svm-poly-tune}
-# # find optimal cost of misclassification
-# tune.out <- tune(svm, LeadStatus~., kernel = "poly", degree=2, data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.1 ,1 ,10 ,100 ,1000),
-# gamma=c(0.5,1,2,3,4)), probability=TRUE)
-# # extract the best model
-# summary(tune.out)
-# (bestmod <- tune.out$best.model)
-# summary(bestmod)
-```
+<!-- ```{r svm-poly-tune} -->
+<!-- # # find optimal cost of misclassification -->
+<!-- # tune.out <- tune(svm, LeadStatus~., kernel = "poly", degree=2, data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")], ranges =list(cost=c(0.1 ,1 ,10 ,100 ,1000), -->
+<!-- # gamma=c(0.5,1,2,3,4)), probability=TRUE) -->
+<!-- # # extract the best model -->
+<!-- # summary(tune.out) -->
+<!-- # (bestmod <- tune.out$best.model) -->
+<!-- # summary(bestmod) -->
+<!-- ``` -->
 
-```{r svm-poly-accuracy}
-dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE)
-table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3)
+<!-- ```{r svm-poly-accuracy} -->
+<!-- dev.svm.pred = predict(svmfit,newdata = combined.dev,probability=TRUE) -->
+<!-- table(combined.dev$LeadStatus, dev.svm.pred) %>% prop.table() %>% round(3) -->
 
-# accuracy rate
-mean(dev.svm.pred == combined.dev$LeadStatus)
+<!-- # accuracy rate -->
+<!-- mean(dev.svm.pred == combined.dev$LeadStatus) -->
 
-# error rate
-mean(dev.svm.pred != combined.dev$LeadStatus)
-```
+<!-- # error rate -->
+<!-- mean(dev.svm.pred != combined.dev$LeadStatus) -->
+<!-- ``` -->
 
-```{r roc-curve-svm-poly}
-# ROC curves
-probabilities = attr(dev.svm.pred, "probabilities")
-prediction(probabilities[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "tpr", x.measure = "fpr") %>%
-  plot()
+<!-- ```{r roc-curve-svm-poly} -->
+<!-- # ROC curves -->
+<!-- probabilities = attr(dev.svm.pred, "probabilities") -->
+<!-- prediction(probabilities[,2], combined.dev$LeadStatus) %>% -->
+<!--   performance(measure = "tpr", x.measure = "fpr") %>% -->
+<!--   plot() -->
 
-# AUC
-prediction(probabilities[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "auc") %>%
-  .@y.values
+<!-- # AUC -->
+<!-- prediction(probabilities[,2], combined.dev$LeadStatus) %>% -->
+<!--   performance(measure = "auc") %>% -->
+<!--   .@y.values -->
 
-# Cross-entropy
-prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
-  performance(measure = "mxe") %>%
-  .@y.values
-```
+<!-- # Cross-entropy -->
+<!-- prediction(probabilities[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>% -->
+<!--   performance(measure = "mxe") %>% -->
+<!--   .@y.values -->
+<!-- ``` -->
 
-```{r write-svm-poly-result}
-test=E_df
-test.svm.pred = predict(svmfit, newdata = test, probability=TRUE)
-probabilities = attr(test.svm.pred, "probabilities")
-test$LeadStatus = probabilities[,1]
-test = test[,c("AssessmentiD","LeadStatus")]
+<!-- ```{r write-svm-poly-result} -->
+<!-- test=E_df -->
+<!-- test.svm.pred = predict(svmfit, newdata = test, probability=TRUE) -->
+<!-- probabilities = attr(test.svm.pred, "probabilities") -->
+<!-- test$LeadStatus = probabilities[,1] -->
+<!-- test = test[,c("AssessmentiD","LeadStatus")] -->
 
-# compare to logistic regression
-plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
-abline(0,1)
+<!-- # compare to logistic regression -->
+<!-- plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5)) -->
+<!-- abline(0,1) -->
 
-# write for kaggle prediction
-write.csv(test,"Predictions/svm-poly2-prediction.csv",row.names=FALSE)
-```
+<!-- # write for kaggle prediction -->
+<!-- write.csv(test,"Predictions/svm-poly2-prediction.csv",row.names=FALSE) -->
+<!-- ``` -->
 
 
-## Gradient Boosting 
+## Gradient Boosting
 ```{r h2o}
 #h2o.no_progress()
 h2o.removeAll()
-h2o.init(max_mem_size="4g")
+h2o.init(max_mem_size="6g")
 Y.train = "LeadStatus"
 X.train = setdiff(names(combined.train),c(Y.train,"Country"))
 combined.train.h2o.gbm = as.h2o(combined.train)
@@ -755,35 +732,36 @@ getROC.h2o(h2o.gbm.fit1,combined.dev.h2o.gbm)
 The development logloss from a default GBM model with 6-fold CV is 0.49 - not bad. The default model has 50 trees. We can train for more trees (say up to 1000):
 ```{r more trees gbm}
 h2o.gbm.fit2 = h2o.gbm(x=X.train,y=Y.train,training_frame=combined.train.h2o.gbm,nfolds=6,ntrees=1000,stopping_rounds=10,stopping_tolerance=0,seed=123)
-h2o.gbm.fit2
 
+h2o.gbm.fit2
 getROC.h2o(h2o.gbm.fit2,combined.dev.h2o.gbm)
 ```
-Now the logloss gets slightly better. 
+Now the logloss gets slightly better.
 
-Let's try tuning the parameters: ntrees, max_depth, min_rows, learn_rate, learn_rate_annealing, sample_rate, col_sample_rate. To speed this up, we'll use the development set for validation: 
+Let's try tuning the parameters: ntrees, max_depth, min_rows, learn_rate, learn_rate_annealing, sample_rate, col_sample_rate. To speed this up, we'll use the development set for validation:
 ```{r tuning}
 hyper_grid=list(
-  max_depth = c(3, 4, 5), # 2 < and < 6 
+  max_depth = c(3, 4, 5), # 2 < and < 6
   min_rows = c(10, 20, 30, 40),
   learn_rate = c(0.0025, 0.005, 0.01, 0.05), # > 0.001 and < 0.1
   learn_rate_annealing = c(1), # 1 is best
   sample_rate = c(.65, .7,0.75,.8,.85), # > 0.6 and < 0.9
   col_sample_rate = c(0.6, 0.7,.8, .9) # > 0.6 and < 1
 )
+
 search_criteria=list(
   strategy="RandomDiscrete",
   stopping_metric="logloss",
   stopping_tolerance=0.005,
   stopping_rounds=10,
-  max_runtime_secs=60*30
+  max_runtime_secs=60*1
 )
 
 grid = h2o.grid(
   algorithm = "gbm",
   grid_id = "gbm_random_discrete",
-  x = X.train, 
-  y = Y.train, 
+  x = X.train,
+  y = Y.train,
   training_frame = combined.train.h2o.gbm,
   validation_frame = combined.dev.h2o.gbm,
   hyper_params = hyper_grid,
@@ -793,6 +771,7 @@ grid = h2o.grid(
   stopping_tolerance = 0,
   seed = 123
   )
+
 grid_perf= h2o.getGrid(grid_id="gbm_random_discrete",sort_by="logloss",decreasing=FALSE)
 best_model_id = grid_perf@model_ids[[1]]
 best_model.random.discrete = h2o.getModel(best_model_id)
@@ -819,7 +798,7 @@ h2o.final <- h2o.gbm(
 
 # model stopped after xx trees
 h2o.final@parameters$ntrees
-h2o.varimp_plot(h2o.final, num_of_features = 5) 
+h2o.varimp_plot(h2o.final, num_of_features = 5)
 ```
 
 Let's predict the Kaggle test set:
@@ -836,29 +815,48 @@ getPredict = function(model.h2o,test_df,file.output){
   test_df$LeadStatus = pred_df$Flagged
   test.output = test_df[,c("AssessmentiD","LeadStatus")]
   write.csv(test.output,file.output,row.names = FALSE)
+
+  plot(test.output.glm$LeadStatus,test_df$LeadStatus,xlim = c(0,0.5),ylim = c(0,0.5))
+  abline(0,1)
 }
-test=E_df # study E is the test set 
+test=E_df # study E is the test set
 getPredict(best_model.random.discrete,test,"Predictions/test.gbm.csv")
 ```
 
-Maybe including all the individual scores would help. 
-```{r gbm with all}
+
+### GBM with all predictors
+Maybe including all the individual scores would help. First create the h2o dataframes:
+```{r h2o-dfs-gbm-all-pred}
 Y.train = "LeadStatus"
-X.train = setdiff(names(combined.train.all),c(Y.train,"Country"))
+X.train = setdiff(names(combined.train.all),c(Y.train,"Country")) # the predictors
 combined.train.h2o.gbm = as.h2o(combined.train.all)
 combined.dev.h2o.gbm = as.h2o(combined.dev.all)
+```
+
+Now we will again perform a random discrete grid search.
+```{r gbm-all-pred-search}
+hyper_grid=list(
+  max_depth = c(4, 5, 6), # > 4
+  min_rows = c(5, 10, 20, 30, 40), # > 5 and < 40
+  learn_rate = c(0.01, 0.05, 0.1), # >= 0.01 and < 0.1
+  learn_rate_annealing = c(1), # 1 is best
+  sample_rate = c(.8), # >= 0.75 and <= 0.8
+  col_sample_rate = c(0.8) # >= 0.7 and <= 0.8
+)
+
 search_criteria = list(
   strategy = "RandomDiscrete",
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*10 # 10 min
+  max_runtime_secs = 60*1 # covers 36 models in 15 min
 )
+
 grid = h2o.grid(
   algorithm = "gbm",
   grid_id = "gbm_grid_all",
-  x = X.train, 
-  y = Y.train, 
+  x = X.train,
+  y = Y.train,
   training_frame = combined.train.h2o.gbm,
   validation_frame = combined.dev.h2o.gbm,
   hyper_params = hyper_grid,
@@ -868,17 +866,137 @@ grid = h2o.grid(
   stopping_tolerance = 0,
   seed = 123
   )
+
 grid_perf = h2o.getGrid(grid_id = "gbm_grid_all",sort_by = "logloss",decreasing = FALSE)
 best_model_id = grid_perf@model_ids[[1]]
 best_model = h2o.getModel(best_model_id)
-
-temp = h2o.gbm(x = X.train,y = Y.train,training_frame = combined.train.h2o.gbm,nfolds = 6,ntrees = 1000,stopping_rounds = 10,stopping_tolerance = 0,seed = 123)
-
-#getROC.h2o(temp,combined.dev.h2o.gbm)
-temp_pm = h2o.performance(temp,newdata = combined.dev.h2o.gbm)
-h2o.logloss(temp_pm)
+summary(grid_perf)
+getROC.h2o(best_model,combined.dev.h2o.gbm)
 ```
-With all the data, the log-loss is much worse: 0.54 now. 
+
+```{r evaluate-gbm-all}
+train.h2o <- as.h2o(combined.all)
+
+# train final model with more trees and on full data
+h2o.final <- h2o.gbm(
+  x = X.train,
+  y = Y.train,
+  training_frame = train.h2o,
+  ntrees = 10000,
+  learn_rate = 0.01,
+  learn_rate_annealing = 1,
+  max_depth = 6,
+  min_rows = 30,
+  sample_rate = 0.8,
+  col_sample_rate = 0.8,
+  stopping_rounds = 10,
+  seed = 1
+)
+
+# model stopped after xx trees
+h2o.final@parameters$ntrees
+h2o.varimp_plot(h2o.final)
+getROC.h2o(h2o.final,combined.dev.h2o.gbm)
+```
+
+```{r gbm-pred-all-predict}
+getPredict(h2o.final,test.all,"Predictions/test.gbm.all.csv")
+```
+
+
+
+## Random forests 
+```{r default-rf-model}
+#library(randomForest) # basic implementation
+library(ranger)       # a faster implementation of randomForest
+
+# for reproduciblity
+set.seed(1)
+
+# default RF model
+m1 <- ranger(
+  formula = LeadStatus ~ .,
+  data    = combined.train.all,
+  probability = T
+)
+
+m1
+```
+
+```{r rf-error}
+# prediction 
+pred_randomForest <- predict(m1, test.all)
+plot(test.output.glm$LeadStatus,pred_randomForest$predictions[,1],xlim=c(0,.5),ylim=c(0,.5))
+abline(0,1)
+```
+
+### Tuning via h2o
+```{r h2o-rf}
+# start up h2o
+h2o.removeAll()
+h2o.init(max_mem_size = "6g")
+set.seed(1)
+
+# hypergrid
+hyper_grid.h2o <- list(
+  ntrees      = seq(200, 500, by = 150),
+  mtries      = seq(15, 35, by = 10),
+  max_depth   = seq(20, 40, by = 5),
+  min_rows    = seq(1, 5, by = 2),
+  nbins       = seq(10, 30, by = 5),
+  sample_rate = c(.55, .632, .75)
+)
+
+# total number of combinations
+nrow(hyper_grid.h2o)
+
+# random grid search criteria
+search_criteria <- list(
+  strategy = "RandomDiscrete",
+  stopping_metric = "logloss",
+  stopping_tolerance = 0.005,
+  stopping_rounds = 10,
+  max_runtime_secs = 60*1
+  )
+
+# build grid search
+random_grid <- h2o.grid(
+  algorithm = "randomForest",
+  grid_id = "rf_grid2",
+  x = X.train, 
+  y = Y.train, 
+  training_frame = combined.train.h2o.gbm,
+  hyper_params = hyper_grid.h2o,
+  search_criteria = search_criteria
+  )
+
+# collect the results and sort by our model performance metric of choice
+grid_perf2 <- h2o.getGrid(
+  grid_id = "rf_grid2",
+  sort_by = "logloss",
+  decreasing = FALSE
+  )
+
+best_model_id = grid_perf@model_ids[[1]]
+best_model = h2o.getModel(best_model_id)
+summary(grid_perf2)
+getROC.h2o(best_model,combined.dev.h2o.gbm)
+```
+
+
+```{r h2o-rf-evaluate}
+# Grab the model_id for the top model, chosen by validation error
+best_model_id <- grid_perf2@model_ids[[1]]
+best_model <- h2o.getModel(best_model_id)
+
+# Now let’s evaluate the model performance on a test set
+h2o.varimp_plot(best_model) 
+getROC.h2o(best_model,combined.dev.h2o.gbm)
+
+# View prediction
+getPredict(best_model,test.all,"Predictions/test.gbm.all.csv")
+```
+
 
 
 
