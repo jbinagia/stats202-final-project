@@ -68,8 +68,8 @@ combined_df_control=combined_df[which(combined_df$TxGroup == "Control"),]
 # combined_df_control$roll=rollmean(combined_df_control$PANSS_Total,moving_average_day,na.pad=TRUE)
 
 p = ggplot(NULL,aes())+
-  geom_jitter(data=combined_df_treated,aes(x=VisitDay,y=PANSS_Total,col="Treatment"),size=0.5)+
-  geom_jitter(data=combined_df_control,aes(x=VisitDay,y=PANSS_Total,col="Control"),size=0.5)+
+  geom_point(data=combined_df_treated,aes(x=VisitDay,y=PANSS_Total,col="Treatment"),size=0.5)+
+  geom_point(data=combined_df_control,aes(x=VisitDay,y=PANSS_Total,col="Control"),size=0.5)+
   scale_color_manual(values=rev(pal_aaas("default")(2)))+
   #geom_line(data=combined_df_treated,aes(x=VisitDay,y=roll,col="Treatment"))+
   #geom_line(data=combined_df_control,aes(x=VisitDay,y=roll,col="Control"))+
@@ -93,48 +93,53 @@ Instead of looking at combined scores scores, we can look at individual positive
 combined_df_treated=combined_df[which(combined_df$TxGroup == "Treatment"),]
 combined_df_control=combined_df[which(combined_df$TxGroup == "Control"),]
 
-i = 9 # to prevent an overabundance of output in the html/pdf document 
+i =37# to prevent an overabundance of output in the html/pdf document 
 #for (i in 9:38) {
 p = ggplot(NULL,aes())+
-  geom_jitter(data=combined_df_treated,aes(x=VisitDay,y=combined_df_treated[,i],col="Treatment"),size=0.5)+
-  geom_jitter(data=combined_df_control,aes(x=VisitDay,y=combined_df_control[,i],col="Control"),size=0.5)+
+  geom_point(data=combined_df_treated,aes(x=VisitDay,y=combined_df_treated[,i],col="Treatment"),size=0.5)+
+  geom_point(data=combined_df_control,aes(x=VisitDay,y=combined_df_control[,i],col="Control"),size=0.5)+
   scale_color_manual(values=rev(pal_aaas("default")(2)))+
   theme_minimal()+
-  theme(legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
+  theme(legend.position = "top",legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
 print(p)
 #}
 ```
 Again do not see an appreciable difference between control and treatment. 
 
 ### Total scores for each category 
+Instead of looking at the total PANSS score, we can look at the total scores for each symptom category (e.g. only the positive symptoms). 
 ```{r total scores vs Visit}
 #Plot total for each category vs Visit Day, for patients and control
 combined_df_treated=combined_df[which(combined_df$TxGroup == "Treatment"),]
 combined_df_control=combined_df[which(combined_df$TxGroup == "Control"),]
 
 p = ggplot(NULL,aes())+
-  geom_jitter(data=combined_df_treated,aes(x=VisitDay,y=totalP,col="Treatment"),size=0.5)+
-  geom_jitter(data=combined_df_control,aes(x=VisitDay,y=totalP,col="Control"),size=0.5)+
+  geom_point(data=combined_df_treated,aes(x=VisitDay,y=totalP,col="Treatment"),size=0.5)+
+  geom_point(data=combined_df_control,aes(x=VisitDay,y=totalP,col="Control"),size=0.5)+
   scale_color_manual(values=rev(pal_aaas("default")(2)))+
   theme_minimal()+
-  theme(legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
-print(p)
+  theme(legend.position = "top",legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
+ggsave("Figures/panss_total_p.png",width=6,height=4,units="in",device="png",dpi="retina")
+#print(p)
+p + p+ facet_grid(cols = vars(3))
 ```
 
-### Total PANSS for a given study 
+### Total PANSS for a given study
+We can also focus on the trend for a given study. 
 ```{r total scores for given study}
-study = E_sub
+study = D_sub
 
 treated = study[which(study$TxGroup == "Treatment"),]
 control = study[which(study$TxGroup == "Control"),]
 
 p = ggplot(NULL,aes())+
-  geom_jitter(data=treated,aes(x=VisitDay,y=PANSS_Total,col="Treatment"),size=0.5)+
-  geom_jitter(data=control,aes(x=VisitDay,y=PANSS_Total,col="Control"),size=0.5)+
+  geom_point(data=treated,aes(x=VisitDay,y=PANSS_Total,col="Treatment"),size=0.5)+
+  geom_point(data=control,aes(x=VisitDay,y=PANSS_Total,col="Control"),size=0.5)+
   scale_color_manual(values=rev(pal_aaas("default")(2)))+
   theme_minimal()+
-  theme(legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
+  theme(legend.position = "top",legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
 print(p)
+ggsave("Figures/panss_total_study_d.png",width=6,height=4,units="in",device="png",dpi="retina")
 ```
 No individual study appears to show an effect of treatment. 
 
@@ -175,8 +180,8 @@ From the linear regression, we cannot rule out the hypothesis that the treatment
 <!-- # combined_df_control$roll=rollmean(combined_df_control$deltaPANSS,moving_average_day,na.pad=TRUE) -->
 
 <!-- p=ggplot(NULL,aes())+ -->
-<!--   geom_jitter(data=combined_df_treated,aes(x=VisitDay,y=deltaPANSS,col="Treatment"),size=0.5)+ -->
-<!--   geom_jitter(data=combined_df_control,aes(x=VisitDay,y=deltaPANSS,col="Control"),size=0.5)+ -->
+<!--   geom_point(data=combined_df_treated,aes(x=VisitDay,y=deltaPANSS,col="Treatment"),size=0.5)+ -->
+<!--   geom_point(data=combined_df_control,aes(x=VisitDay,y=deltaPANSS,col="Control"),size=0.5)+ -->
 <!--   scale_color_manual(values=rev(pal_aaas("default")(2)))+ -->
 <!--   #geom_line(data=combined_df_treated,aes(x=VisitDay,y=roll,col="Treatment"))+ -->
 <!--   #geom_line(data=combined_df_control,aes(x=VisitDay,y=roll,col="Control"))+ -->
