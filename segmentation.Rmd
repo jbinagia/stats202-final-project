@@ -107,8 +107,7 @@ summary(scaled_df)
 #                     clMethods = c("kmeans","pam"), validation = c("internal", "stability"))
 #summary(cvalid.out)
 ```
-
-![clValid results](clustering-results.png)
+We can save time by only running this cell once and loading the results otherwise: ![clValid results](Figures/clustering-results.png)
 
 # K-means clustering 
 ## determine optimal number of clusters
@@ -127,16 +126,18 @@ fviz_nbclust(scaled_df, kmeans, method = "silhouette")+
 # recommended value: nboot= 500 for your analysis.
 # Use verbose = FALSE to hide computing progression.
 
-set.seed(1)
-gc() 
-fviz_nbclust(scaled_df, kmeans,k.max = 10,iter.max=30,nstart = 25,method="gap_stat",nboot = 500)+
-  labs(subtitle = "Gap statistic method")
+# set.seed(1)
+# gc() 
+# fviz_nbclust(scaled_df, kmeans,k.max = 10,iter.max=30,nstart = 25,method="gap_stat",nboot = 500)+
+#   labs(subtitle = "Gap statistic method")
 ```
+The gap statistic in the above cell is a length computation. Only uncomment when needed. 
 
 ## 30 indices for determing value of k 
 ```{r 30-indices}
-NbClust(data = scaled_df, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans");
+# NbClust(data = scaled_df, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans");
 ```
+Likewise, computed all 30 indices every time the script is ran is quite time-consuming. We will only uncomment this cell when needed. 
 
 ## K-means clustering for chosen value of k 
 ```{r k-means}
@@ -173,11 +174,11 @@ fviz_nbclust(scaled_df, pam, method = "silhouette")+
 # recommended value: nboot= 500 for your analysis.
 # Use verbose = FALSE to hide computing progression.
 
-set.seed(1)
-fviz_nbclust(scaled_df, k.max = 10, pam,method="gap_stat",nboot = 50)+
-  labs(subtitle = "Gap statistic method")
+#set.seed(1)
+#fviz_nbclust(scaled_df, k.max = 10, pam,method="gap_stat",nboot = 50)+
+#  labs(subtitle = "Gap statistic method")
 ```
-
+As for K-means, we only compute the gap statistic when needed. Otherwise it is commented out. 
 
 
 ## Pam algorithm
