@@ -754,7 +754,7 @@ search_criteria=list(
   stopping_metric="logloss",
   stopping_tolerance=0.005,
   stopping_rounds=10,
-  max_runtime_secs=60*1
+  max_runtime_secs=60*60*3
 )
 
 grid = h2o.grid(
@@ -950,7 +950,7 @@ search_criteria <- list(
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*60 # did about 50 in 15 min
+  max_runtime_secs = 60*60*3 # did about 50 in 15 min
   )
 
 # build grid search
