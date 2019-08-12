@@ -937,15 +937,12 @@ set.seed(1)
 # hypergrid
 hyper_grid.h2o <- list(
   ntrees      = seq(200, 500, by = 150),
-  mtries      = c(15,20,25,30,33),
+  mtries      = c(15, 20, 25, 30),
   max_depth   = seq(20, 40, by = 5),
   min_rows    = seq(1, 5, by = 2),
   nbins       = seq(10, 30, by = 5),
   sample_rate = c(.55, .632, .75)
 )
-
-# total number of combinations
-nrow(hyper_grid.h2o)
 
 # random grid search criteria
 search_criteria <- list(
@@ -953,7 +950,7 @@ search_criteria <- list(
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*15
+  max_runtime_secs = 60*60 # did about 50 in 15 min
   )
 
 # build grid search
@@ -993,12 +990,12 @@ h2o.final <- h2o.randomForest(
   x = X.train,
   y = Y.train,
   training_frame = train.h2o,
-  ntrees      = seq(200, 500, by = 150),
-  mtries      = seq(15, 35, by = 10),
-  max_depth   = seq(20, 40, by = 5),
-  min_rows    = seq(1, 5, by = 2),
-  nbins       = seq(10, 30, by = 5),
-  sample_rate = c(.55, .632, .75)
+  ntrees      = 500,
+  mtries      = 15,
+  max_depth   = 25,
+  min_rows    = 3,
+  nbins       = 25,
+  sample_rate = 0.75,
   stopping_rounds = 10,
   seed = 1
 )
