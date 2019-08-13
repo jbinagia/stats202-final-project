@@ -377,7 +377,7 @@ roc.dev = roc(LeadStatus~lasso_prob, data = combined.dev.all)
 plot(roc.dev,xlim = c(0,1),ylim = c(0,1))
 
 #kaggle test
-x_test <- model.matrix(test.all$LeadStatus~., test.all)
+x_test <- model.matrix(LeadStatus~., test.all)
 lasso_prob <- predict(cv.out, newx = x_test, s=lambda_1se, type="response")
 #write.csv(test.all.glm,"Predictions/test.lasso.glm.csv",row.names = FALSE)
 
