@@ -368,17 +368,18 @@ coef(cv.out,s=lambda_1se)
 
 ```{r lasso-performance}
 #get dev set data
-x_test <- model.matrix(LeadStatus~., combined.dev.all)
+x_test1 <- model.matrix(LeadStatus~., combined.dev.all)
 
 #predict class, type=”class”
-lasso_prob <- predict(cv.out, newx = x_test, s=lambda_1se, type="response")
+lasso_prob <- predict(cv.out, newx = x_test1, s=lambda_1se, type="response")
 
 roc.dev = roc(LeadStatus~lasso_prob, data = combined.dev.all)
 plot(roc.dev,xlim = c(0,1),ylim = c(0,1))
 
 #kaggle test
-x_test <- model.matrix(LeadStatus~., test.all)
-lasso_prob <- predict(cv.out, newx = x_test, s=lambda_1se, type="response")
+test.all$LeadStatus = test.full.glm$LeadStatus
+x_test2 <- model.matrix(LeadStatus~., test.all)
+lasso_prob <- predict(cv.out, newx = x_test2, s=lambda_1se, type="response")
 #write.csv(test.all.glm,"Predictions/test.lasso.glm.csv",row.names = FALSE)
 
 # compare to original logistic regression
