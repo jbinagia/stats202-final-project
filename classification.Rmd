@@ -272,7 +272,7 @@ write.csv(test.full.glm,"Predictions/test.glm.full.csv",row.names = FALSE)
 plot(test.output.glm$LeadStatus,test.full.glm$LeadStatus)
 abline(0,1)
 ```
-### Logistic regression (all individual scores)
+### Logistic regression (all individual scores + lasso)
 ```{r include scores}
 # create dataframe that has all individual PANSS scores
 combined.all = rbind(A_init_df, B_init_df, C_init_df, D_init_df)
@@ -308,14 +308,82 @@ test.all = E_df_tmp # study E is the test set
 ```
 
 ```{r logistic-all-predictors}
-model1 <- glm(LeadStatus ~., family = "binomial", data = combined.train.all)
-summary(model1)
+train.all.glm <- glm(LeadStatus ~., family = "binomial", data = combined.train.all)
+summary(train.all.glm)
 ```
 
 ```{r more-log-all-pred-evaluation}
 library(broom)      # helps to tidy up model outputs
-tidy(model1)
-caret::varImp(model1)
+tidy(train.all.glm)
+caret::varImp(train.all.glm)
+
+#dev test
+glm.probs.flag.dev = 1 - predict(train.all.glm, combined.dev.all, type = "response")
+glm.pred = rep("Passed", dim(combined.dev.all)[1])
+glm.pred[glm.probs.flag.dev > 0.2] = "Flagged"
+table(glm.pred,combined.dev.all$LeadStatus)
+roc.dev = roc(LeadStatus~glm.probs.flag.dev,data = combined.dev.all)
+plot(roc.dev,xlim = c(0,1),ylim = c(0,1))
+
+#kaggle test
+test = test.all
+glm.probs = predict(train.all.glm, test, type = "response")
+glm.probs.flag = 1 - glm.probs
+names(test)
+test.all.glm = as.data.frame(test$AssessmentiD)
+test.all.glm$LeadStatus = glm.probs.flag
+colnames(test.all.glm)[colnames(test.all.glm)=="test$AssessmentiD"] <- "AssessmentID"
+write.csv(test.all.glm,"Predictions/test.all.glm.csv",row.names = FALSE)
+
+# compare to original logistic regression
+plot(test.output.glm$LeadStatus,test.all.glm$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
+abline(0,1)
+```
+
+### Logistic with lasso
+```{r log-lasso}
+library(glmnet)
+
+#convert training data to matrix format
+x <- model.matrix(LeadStatus~., combined.train.all)
+
+#convert class to numerical variable
+y <- ifelse(combined.train.all$LeadStatus=="Passed",1,0)
+
+#perform grid search to find optimal value of lambda
+#family= binomial => logistic regression, alpha=1 => lasso
+# check docs to explore other type.measure options
+cv.out <- cv.glmnet(x,y, alpha=1, family="binomial",type.measure="auc")
+#plot result
+plot(cv.out)
+```
+```{r find-optimal-lambda}
+#min value of lambda
+lambda_min <- cv.out$lambda.min
+#best value of lambda
+lambda_1se <- cv.out$lambda.1se
+#regression coefficients
+coef(cv.out,s=lambda_1se)
+```
+
+```{r lasso-performance}
+#get dev set data
+x_test <- model.matrix(LeadStatus~., combined.dev.all)
+
+#predict class, type=”class”
+lasso_prob <- predict(cv.out, newx = x_test, s=lambda_1se, type="response")
+
+roc.dev = roc(LeadStatus~lasso_prob, data = combined.dev.all)
+plot(roc.dev,xlim = c(0,1),ylim = c(0,1))
+
+#kaggle test
+x_test <- model.matrix(test.all$LeadStatus~., test.all)
+lasso_prob <- predict(cv.out, newx = x_test, s=lambda_1se, type="response")
+#write.csv(test.all.glm,"Predictions/test.lasso.glm.csv",row.names = FALSE)
+
+# compare to original logistic regression
+#plot(test.output.glm$LeadStatus,lasso_prob,xlim=c(0,0.5),ylim=c(0,0.5))
+#abline(0,1)
 ```
 
 ## LDA
@@ -764,7 +832,7 @@ search_criteria=list(
   stopping_metric="logloss",
   stopping_tolerance=0.005,
   stopping_rounds=10,
-  max_runtime_secs=60*60*3
+  max_runtime_secs=60*1
 )
 
 grid = h2o.grid(
@@ -960,7 +1028,7 @@ search_criteria <- list(
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*60*3 # did about 50 in 15 min
+  max_runtime_secs = 60*60*5 # did about 50 in 15 min
   )
 
 # build grid search
