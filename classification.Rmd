@@ -39,9 +39,19 @@ knitr::opts_chunk$set(echo = TRUE)
     - https://medium.com/@aravanshad/gradient-boosting-versus-random-forest-cfa3fa8f0d80
     - http://fastml.com/what-is-better-gradient-boosted-trees-or-random-forest/
     - random forests easier to tune but usually on par if not slightly worse than gbm
-  
+  - 
 
 # Thoughts/Conclusions
+- we started off with Naive Bayes, and our test logloss was middle of the Kaggle board (70)
+- then logistic, then LDA which as expected did similar, QDA was worse, as expected - so maybe linear decision boundary. 
+    decreasing bias by assuming different variances for each predictor in QDA wasn't a good tradeoff with increasing variance. 
+    both were better than naive bayes. 
+- then we tried SVM, which didn't do better than logistic even with extensive tuning, 
+- then gbm and rf which also sucked. BUT gbm and SVM had lower development set loglosses, so we'll submit anyway.
+- perhaps they didn't they do as well because decision boundary truly is linear, which is why logistic regression worked so well. 
+
+
+
 
 # Setup
 ```{r Load Libraries, results="hide"}

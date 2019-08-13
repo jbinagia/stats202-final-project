@@ -57,6 +57,22 @@ library(ggsci)
   -> ?? But we could make a "ranked" time series where t = number of days from baseline visit for each patient = VisitDay
 
 ## Thoughts/Conclusions
+- We started with a "naive" forecast that simply took the previous value and found it performed the best based on:
+  MSE of development
+  MSE of public leaderboard test set (at the time of writing, we were in 5th place)
+   exponential smoothing:
+      we thought we'd look at the last 2,3,4 points in time and weigh the most recent ones better, but it didn't work much better on teh test or dev set. 
+- We tried: 
+  xgboost (Gradient boosting)
+  random Forest
+    Neither of the above captured outliers well, possibly because they captured mean values 
+  linear reg
+  lasso
+  ridge
+    to get rid of predictors. 
+    If we had more time, we'd do linear, lasso or ridge but only looking at later VisitDays because plotting Panss_Total vs VisitDay reveals a non-linear relationship. 
+  MARS
+  
 - decision trees are likely ill-suited for this dataset https://stats.stackexchange.com/questions/235189/random-forest-regression-not-predicting-higher-than-training-data
 
 ## Setup
