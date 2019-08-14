@@ -381,7 +381,6 @@ test.all$LeadStatus = test.full.glm$LeadStatus
 x_test2 <- model.matrix(LeadStatus~., test.all)
 lasso_prob <- predict(cv.out, newx = x_test2, s=lambda_1se, type="response")
 #write.csv(test.all.glm,"Predictions/test.lasso.glm.csv",row.names = FALSE)
-
 # compare to original logistic regression
 #plot(test.output.glm$LeadStatus,lasso_prob,xlim=c(0,0.5),ylim=c(0,0.5))
 #abline(0,1)
