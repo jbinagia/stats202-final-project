@@ -173,9 +173,9 @@ fviz_nbclust(scaled_df, pam, method = "silhouette")+
 # recommended value: nboot= 500 for your analysis.
 # Use verbose = FALSE to hide computing progression.
 
-set.seed(1)
-fviz_nbclust(scaled_df, k.max = 10, pam,method="gap_stat",nboot = 50)+
- labs(subtitle = "Gap statistic method")
+# set.seed(1)
+# fviz_nbclust(scaled_df, k.max = 10, pam,method="gap_stat",nboot = 50)+
+#  labs(subtitle = "Gap statistic method")
 ```
 As for K-means, we only compute the gap statistic when needed. Otherwise it is commented out. ![pams-gap](Figures/gap-statistic-pams.png)
 
@@ -192,7 +192,7 @@ fviz_cluster(pam.res, geom = "point") + theme_minimal() + labs(title ="")  + the
 ## PCA for data interpretation
 ```{r pca}
 pca.out = prcomp(scaled_df, scale=TRUE)
-ggplot2::autoplot(pca.out, label = FALSE, loadings.label = TRUE)
+ggplot2::autoplot(pca.out, label = FALSE, loadings.label = TRUE, repel=TRUE) + theme_minimal()
 ```
 
 ```{r pca-function}
@@ -237,6 +237,11 @@ fviz_screeplot(res.pca, addlabels = TRUE, ylim = c(0, 50))
 fviz_pca_var(res.pca, col.var="contrib",
              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
              repel = TRUE # Avoid text overlapping
+             )
+fviz_pca_ind(res.pca, col.ind = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             label = FALSE, 
+             repel = TRUE # Avoid text overlapping (slow if many points)
              )
 ```
 
