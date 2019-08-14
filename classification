@@ -230,6 +230,7 @@ glm.pred[glm.probs.flag.dev>0.2] = "Flagged"#change relevant values to "Flagged"
 table(glm.pred,combined.dev$LeadStatus)
 roc.dev = roc(LeadStatus~glm.probs.flag.dev,data = combined.dev)
 plot(roc.dev,xlim = c(0,1),ylim = c(0,1))
+savePlot("Figures/glm_roc.png",type="png",device=dev.cur())
 
 #kaggle test
 test = E_df
@@ -378,19 +379,17 @@ plot(roc.dev,xlim = c(0,1),ylim = c(0,1))
 test.all$LeadStatus = test.full.glm$LeadStatus
 x_test2 <- model.matrix(LeadStatus~., test.all[,-which(names(test.all) == "AssessmentiD")])
 lasso_prob <- predict(cv.out, newx = x_test2, s=lambda_1se, type="response")
-
+<<<<<<< HEAD
 #write.csv(test.all.glm,"Predictions/test.lasso.glm.csv",row.names = FALSE)
-
+=======
 test.all$LeadStatus = lasso_prob
 test.lasso = subset(test.all, select = c(AssessmentiD,LeadStatus))
 write.csv(test.lasso,"Predictions/test.lasso.glm.csv",row.names = FALSE)
 
-
+>>>>>>> 8299705f28ff7875b0cce377600db7f2a00761a5
 # compare to original logistic regression
 plot(test.output.glm$LeadStatus,lasso_prob,xlim=c(0,0.5),ylim=c(0,0.5))
 abline(0,1)
-
-summary(cv.out$glmnet.fit)
 ```
 
 ## LDA
@@ -813,7 +812,6 @@ data.frame(fpr = fpr.dev, tpr = tpr.dev) %>%
 
 #plot ROC curve
 getROC.h2o(h2o.gbm.fit1,combined.dev.h2o.gbm)
-ggsave("Figures/gbm_def_roc.png",width=6,height=4,units="in",device="png",dpi="retina")
 ```
 The development logloss from a default GBM model with 6-fold CV is 0.49 - not bad. The default model has 50 trees. We can train for more trees (say up to 1000):
 ```{r more trees gbm}
