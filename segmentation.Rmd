@@ -103,8 +103,8 @@ summary(scaled_df)
 
 ## Deciding on a clustering algorithm 
 ```{r choosing}
-cvalid.out = clValid(scaled_df, maxitems = 3000, nClust = 2:8, clMethods = c("kmeans","pam"), validation = c("internal", "stability"))
-summary(cvalid.out)
+#cvalid.out = clValid(scaled_df, maxitems = 3000, nClust = 2:8, clMethods = c("kmeans","pam"), validation = c("internal", "stability"))
+#summary(cvalid.out)
 ```
 We can save time by only running this cell once and loading the results otherwise: ![k-means-gap](Figures/clustering-results.png)
 
@@ -134,9 +134,9 @@ The gap statistic in the above cell is a length computation. Only uncomment when
 
 ### 30 indices for determing value of k 
 ```{r 30-indices}
-NbClust(data = scaled_df, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans");
+# NbClust(data = scaled_df, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans");
 ```
-Likewise, computed all 30 indices every time the script is ran is quite time-consuming. We will only uncomment this cell when needed. 
+This cell calculates 30 different indices from which to determine the optimal number of clusters. Again, this is quite a length computation so we run it once and pull the saved figure otherwise: ![](Figures/30-indices-key-results.png), ![](Figures/30-indices-key-results-plots1.png), and ![](Figures/30-indices-key-results-plots2.png)
 
 ### K-means clustering for chosen value of k 
 ```{r k-means}
