@@ -16,10 +16,10 @@ knitr::opts_chunk$set(echo = TRUE)
     - Country 
     - TxGroup
     - VisitDay
-    - SiteID
-    - RaterID
+    - SiteID??
+    - RaterID??
     - PANSS_Total 
-    - PatientID
+    - PatientID??
   - we will keep AssessmentID in our dataframe as a "key" for each row/patient. 
   - exclude
     - individual scores: hard to see how to interpret if they impact the assessment status. We'll have total score anyway. Sometimes we will use individual scores for predictors at which point we will exclude the total PANSS score. 
@@ -187,7 +187,9 @@ tpr.dev <- h2o.tpr(performance.dev) %>% .[['tpr']]
 data.frame(fpr = fpr.dev, tpr = tpr.dev) %>%
   ggplot(aes(fpr, tpr) ) +
   geom_line() +
-  ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
+  ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) ) + 
+  theme_minimal()
+ggsave("Figures/naive_bayes_roc.png",width=6,height=4,units="in",device="png",dpi="retina")
 
 # predict values with predict -->
 names(test)
@@ -1027,7 +1029,7 @@ search_criteria <- list(
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*60*5 # did about 50 in 15 min
+  max_runtime_secs = 60*1 # did about 50 in 15 min
   )
 
 # build grid search
