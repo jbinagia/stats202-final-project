@@ -114,11 +114,15 @@ We can save time by only running this cell once and loading the results otherwis
 # Elbow method
 fviz_nbclust(scaled_df, kmeans, method = "wss",print.summary=TRUE) +
     geom_vline(xintercept = 2, linetype = 2)+
-  labs(subtitle = "Elbow method")
+  #labs(subtitle = "Elbow method") + 
+  labs(title = "",subtitle = "") + # for the figure in the report
+  ggsave("Figures/k-means-elbow.png",width=3,height=3,units="in",device="png",dpi="retina")
 
 # Silhouette method
 fviz_nbclust(scaled_df, kmeans, method = "silhouette")+
-  labs(subtitle = "Silhouette method")
+  #labs(subtitle = "Silhouette method")
+  labs(title = "",subtitle = "") + # for the figure in the report
+  ggsave("Figures/k-means-silhouette.png",width=3,height=3,units="in",device="png",dpi="retina")
 
 # Gap statistic
 # nboot = 50 to keep the function speedy. Number of Monte Carlo ("bootstrap") samples.
@@ -126,11 +130,11 @@ fviz_nbclust(scaled_df, kmeans, method = "silhouette")+
 # Use verbose = FALSE to hide computing progression.
 
 # set.seed(1)
-# gc()
-# fviz_nbclust(scaled_df, kmeans,k.max = 8,iter.max=30,nstart = 25,method="gap_stat",nboot = 50)+
-#   labs(subtitle = "Gap statistic method")
+#gc()
+#fviz_nbclust(scaled_df, kmeans,k.max = 8,iter.max=30,nstart = 25,method="gap_stat",nboot = 50)+ labs(subtitle = "Gap statistic method")
+#ggsave("Figures/k-means-gap-statistic.png",width=6,height=4,units="in",device="png",dpi="retina")
 ```
-The gap statistic in the above cell is a length computation. Only uncomment when needed. ![clValid results](Figures/gap-statistic-k-means.png)
+The gap statistic in the above cell is a length computation. Only uncomment when needed. ![clValid results](Figures/k-means-gap-statistic.png)
 
 ### 30 indices for determing value of k 
 ```{r 30-indices}
@@ -162,11 +166,15 @@ fviz_cluster(km.out, scaled_df,geom = c("point")) + theme_minimal() + labs(title
 # Elbow method
 fviz_nbclust(scaled_df, pam, method = "wss",print.summary=TRUE) +
     geom_vline(xintercept = 2, linetype = 2)+
-  labs(subtitle = "Elbow method")
+  #labs(subtitle = "Elbow method")
+  labs(title = "",subtitle = "") + # for the figure in the report
+  ggsave("Figures/pam-elbow.png",width=3,height=3,units="in",device="png",dpi="retina")
 
 # Silhouette method
 fviz_nbclust(scaled_df, pam, method = "silhouette")+
-  labs(subtitle = "Silhouette method")
+  #labs(subtitle = "Silhouette method")
+  labs(title = "",subtitle = "") + # for the figure in the report
+  ggsave("Figures/pam-silhouette.png",width=3,height=3,units="in",device="png",dpi="retina")
 
 # Gap statistic
 # nboot = 50 to keep the function speedy. Number of Monte Carlo ("bootstrap") samples.
@@ -174,10 +182,12 @@ fviz_nbclust(scaled_df, pam, method = "silhouette")+
 # Use verbose = FALSE to hide computing progression.
 
 # set.seed(1)
-# fviz_nbclust(scaled_df, k.max = 10, pam,method="gap_stat",nboot = 50)+
-#  labs(subtitle = "Gap statistic method")
+fviz_nbclust(scaled_df, k.max = 10, pam,method="gap_stat",nboot = 50)+
+  #labs(subtitle = "Gap statistic method")
+  labs(title = "",subtitle = "") + # for the figure in the report
+ggsave("Figures/pam-gap-statistic.png",width=3,height=3,units="in",device="png",dpi="retina")
 ```
-As for K-means, we only compute the gap statistic when needed. Otherwise it is commented out. ![pams-gap](Figures/gap-statistic-pams.png)
+As for K-means, we only compute the gap statistic when needed. Otherwise it is commented out. ![pams-gap](Figures/pam-gap-statistic.png)
 
 
 ### Pam algorithm
@@ -193,6 +203,7 @@ fviz_cluster(pam.res, geom = "point") + theme_minimal() + labs(title ="")  + the
 ```{r pca}
 pca.out = prcomp(scaled_df, scale=TRUE)
 ggplot2::autoplot(pca.out, label = FALSE, loadings.label = TRUE, repel=TRUE) + theme_minimal()
+ggsave("Figures/pca-first.png",width=3,height=3,units="in",device="png",dpi="retina")
 ```
 
 ```{r pca-function}
@@ -229,6 +240,7 @@ print(res.pca)
 ### Visualize eigenvalues/variances
 ```{r percent-explained}
 fviz_screeplot(res.pca, addlabels = TRUE, ylim = c(0, 50))
+ggsave("Figures/pca-scree.png",width=3,height=3,units="in",device="png",dpi="retina")
 ```
 
 ### Relationship to predictors
@@ -238,11 +250,14 @@ fviz_pca_var(res.pca, col.var="contrib",
              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
              repel = TRUE # Avoid text overlapping
              )
+ggsave("Figures/pca-variables.png",width=3,height=3,units="in",device="png",dpi="retina")
+
 fviz_pca_ind(res.pca, col.ind = "cos2",
              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
              label = FALSE, 
              repel = TRUE # Avoid text overlapping (slow if many points)
              )
+ggsave("Figures/pam-individuals.png",width=3,height=3,units="in",device="png",dpi="retina")
 ```
 
 ### contributions for each principal component
@@ -250,9 +265,11 @@ fviz_pca_ind(res.pca, col.ind = "cos2",
 
 # Contributions of variables to PC1
 fviz_contrib(res.pca, choice = "var", axes = 1, top = 10)
+ggsave("Figures/contribution1-statistic.png",width=3,height=3,units="in",device="png",dpi="retina")
 
 # Contributions of variables to PC2
 fviz_contrib(res.pca, choice = "var", axes = 2, top = 10)
+ggsave("Figures/contribution2.png",width=3,height=3,units="in",device="png",dpi="retina")
 
 # Contributions of variables to PC2
 fviz_contrib(res.pca, choice = "var", axes = 3, top = 10)
