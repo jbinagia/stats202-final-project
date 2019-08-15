@@ -1090,7 +1090,7 @@ search_criteria <- list(
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*10 # did about 50 in 15 min
+  max_runtime_secs = 60*30 # did about 50 in 15 min
   )
 
 # build grid search
