@@ -1,13 +1,5 @@
 # stats202-final-project
 
-## To-do
-- part 1 and 2
-  - go back and make sure we handled duplicates properly
-- part 3
-  - Take average over last two data points
-  - Simple linear regression 
-- part 4
-
 ## Notes from Google Group
 - Format of write-up: https://groups.google.com/forum/#!topic/stats202/krv72oeLeGw
 - Notes on project: https://groups.google.com/forum/#!topic/stats202/ULXRN3seaBEs
