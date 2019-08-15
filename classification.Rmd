@@ -947,14 +947,14 @@ getPredict = function(model.h2o,test_df,file.output){
   mutate_if(is.factor,factor,ordered = FALSE)%>%
   as.h2o()
 
-  #pred = h2o.predict(model.h2o,test.h2o) #error!!!
-  #pred_df = as.data.frame(pred)
-  #test_df$LeadStatus = pred_df$Flagged
-  #test.output = test_df[,c("AssessmentiD","LeadStatus")]
-  #write.csv(test.output,file.output,row.names = FALSE)
+  pred = h2o.predict(model.h2o,test.h2o) #error!!!
+  pred_df = as.data.frame(pred)
+  test_df$LeadStatus = pred_df$Flagged
+  test.output = test_df[,c("AssessmentiD","LeadStatus")]
+  write.csv(test.output,file.output,row.names = FALSE)
 
-  #plot(test.output.glm$LeadStatus,test_df$LeadStatus,xlim = c(0,0.5),ylim = c(0,0.5))
-  #abline(0,1)
+  plot(test.output.glm$LeadStatus,test_df$LeadStatus,xlim = c(0,0.5),ylim = c(0,0.5))
+  abline(0,1)
 }
 test=E_df # study E is the test set
 getPredict(best_model.random.discrete,test,"Predictions/test.gbm.csv")
@@ -1039,7 +1039,8 @@ ggsave("Figures/gbm_var_imp.png",device="png",dpi="retina")
 ```
 
 ```{r gbm-pred-all-predict}
-#getPredict(h2o.final,test.all,"Predictions/test.gbm.all.csv")
+test.all = test.all[,-which(names(test.all) == c("LeadStatus"))] # remove old lead status column 
+getPredict(h2o.final,test.all,"Predictions/test.gbm.all.csv")
 ```
 
 
@@ -1140,8 +1141,9 @@ h2o.final <- h2o.randomForest(
   sample_rate = 0.75,
   stopping_rounds = 10,
   seed = 1
-)
+) # set these parameters to match those of best model found from hypertuning 
 
 # View prediction
+test.all = test.all[,-which(names(test.all) == c("LeadStatus"))] # remove old lead status column 
 getPredict(h2o.final,test.all,"Predictions/test.rf.all.csv")
 ```
