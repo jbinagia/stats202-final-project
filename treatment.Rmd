@@ -114,12 +114,12 @@ combined_df_treated=combined_df[which(combined_df$TxGroup == "Treatment"),]
 combined_df_control=combined_df[which(combined_df$TxGroup == "Control"),]
 
 p = ggplot(NULL,aes())+
-  geom_point(data=combined_df_treated,aes(x=VisitDay,y=totalP,col="Treatment"),size=0.5)+
-  geom_point(data=combined_df_control,aes(x=VisitDay,y=totalP,col="Control"),size=0.5)+
+  geom_point(data=combined_df_treated,aes(x=VisitDay,y=totalG,col="Treatment"),size=0.5)+
+  geom_point(data=combined_df_control,aes(x=VisitDay,y=totalG,col="Control"),size=0.5)+
   scale_color_manual(values=rev(pal_aaas("default")(2)))+
   theme_minimal()+
   theme(legend.position = "top",legend.title=element_blank(),plot.title=element_text(hjust=0.5,size=10,family="Lato"),plot.subtitle=element_text(hjust=0.5,size=8,family="Lato"),text=element_text(size=10,family="Lato"))
-ggsave("Figures/panss_total_p.png",width=6,height=4,units="in",device="png",dpi="retina")
+ggsave("Figures/panss_total_g.png",width=6,height=4,units="in",device="png",dpi="retina")
 #print(p)
 p + p+ facet_grid(cols = vars(3))
 ```

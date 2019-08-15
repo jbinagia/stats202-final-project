@@ -10,28 +10,28 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Notes/Assumptions
-### Model
-  - LeadStatus is the response
+### Model 
+  - LeadStatus is the response 
   - likely predictors include
-    - Country
+    - Country 
     - TxGroup
     - VisitDay
     - SiteID??
     - RaterID??
-    - PANSS_Total
+    - PANSS_Total 
     - PatientID??
-  - we will keep AssessmentID in our dataframe as a "key" for each row/patient.
+  - we will keep AssessmentID in our dataframe as a "key" for each row/patient. 
   - exclude
-    - individual scores: hard to see how to interpret if they impact the assessment status. We'll have total score anyway. Sometimes we will use individual scores for predictors at which point we will exclude the total PANSS score.
-    - Study: no observation in study E contains the response (LeadStatus).
+    - individual scores: hard to see how to interpret if they impact the assessment status. We'll have total score anyway. Sometimes we will use individual scores for predictors at which point we will exclude the total PANSS score. 
+    - Study: no observation in study E contains the response (LeadStatus). 
   - when it comes time to predict, we specify a assessment ID and get a probability of LeadStatus being NOT Passed (so Flagged or Assigned to CS)
-
+  
 ### Data
   - We'll combine A-D into one dataset
   - The training dataset will be 70% randomly chosen assessment IDs from that combined dataset
   - The development dataset will be the other 30% of that.
-  - The test dataset for kaggle will be study E, for which we have no LeadStatus.
-
+  - The test dataset for kaggle will be study E, for which we have no LeadStatus. 
+  
 ### Notes
   - random forests vs gbm
     - https://stats.stackexchange.com/questions/173390/gradient-boosting-tree-vs-random-forest
@@ -41,19 +41,19 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Thoughts/Conclusions
 - we started off with Naive Bayes, and our test logloss was middle of the Kaggle board (70)
-- then logistic, then LDA which as expected did similar, QDA was worse, as expected - so maybe linear decision boundary.
-  - decreasing bias by assuming different variances for each predictor in QDA wasn't a good tradeoff with increasing variance.
-  - both were better than naive bayes.
-- then we tried SVM, which didn't do better than logistic even with extensive tuning,
+- then logistic, then LDA which as expected did similar, QDA was worse, as expected - so maybe linear decision boundary. 
+  - decreasing bias by assuming different variances for each predictor in QDA wasn't a good tradeoff with increasing variance. 
+  - both were better than naive bayes. 
+- then we tried SVM, which didn't do better than logistic even with extensive tuning, 
 - then gbm and rf which also did not perform well. BUT gbm and SVM had lower development set loglosses, so we'll submit anyway.
-- perhaps they didn't they do as well because decision boundary truly is linear, which is why logistic regression worked so well.
+- perhaps they didn't they do as well because decision boundary truly is linear, which is why logistic regression worked so well. 
 
 
 
 
 ## Setup
 ```{r Load Libraries, results="hide"}
-rm(list = ls()) # clear global environment
+rm(list = ls()) # clear global environment 
 library(dplyr)
 library(ggplot2)
 ```
@@ -69,15 +69,15 @@ names(E_init_df)
 dim(E_init_df)[1]
 ```
 
-The following creates a list of the assessments we should consider for the Kaggle submission. This should be the same as Study E.
+The following creates a list of the assessments we should consider for the Kaggle submission. This should be the same as Study E. 
 ```{r sample submission}
 sample_submission_df = read.csv("Data/sample_submission_status.csv")
-prediction.ids = sample_submission_df$AssessmentID # the AssessmentID #s we should use for Kaggle submission
-length(unique(prediction.ids))
+prediction.ids = sample_submission_df$AssessmentID # the AssessmentID #s we should use for Kaggle submission 
+length(unique(prediction.ids)) 
 length(prediction.ids)
 all(E_init_df$AssessmentiD==prediction.ids)
 ```
-This is the same length as Study E. All the values are in both.
+This is the same length as Study E. All the values are in both. 
 
 ### Data Cleaning
 Remove columns not corresponding to our predictors and response.
@@ -92,28 +92,28 @@ E_df = subset(E_init_df, select = c(Country,TxGroup,VisitDay,PANSS_Total,Assessm
 names(E_df)
 ```
 
-Combine the studies into one dataframe.
+Combine the studies into one dataframe. 
 ```{r combine-studies}
 combined_df = rbind(A_df,B_df,C_df,D_df)
 summary(combined_df)
 names(combined_df)
 ```
-Get rid of any duplicates, by AssessmentiD.
+Get rid of any duplicates, by AssessmentiD. 
 ```{r remove duplicates}
 dim(combined_df)[1]
 combined_df=distinct(combined_df)
 dim(combined_df)[1]
 ```
-We also need to make the ID numbers factors, not numeric data. Indeed, everything but VisitDay and PANSS_Total should be factorized.
+We also need to make the ID numbers factors, not numeric data. Indeed, everything but VisitDay and PANSS_Total should be factorized. 
 ```{r factor}
 combined_df <- mutate_at(combined_df, vars(Country, TxGroup,LeadStatus), as.factor)
-str(combined_df) # compactly display structure of the object
+str(combined_df) # compactly display structure of the object 
 
 E_df<-mutate_at(E_df,vars(Country, TxGroup,AssessmentiD),as.factor)
 str(E_df)
 ```
 
-And since we just want probability of flagged OR assigned to CS, turn LeadStatus into a binary classification of Passed or Flagged.
+And since we just want probability of flagged OR assigned to CS, turn LeadStatus into a binary classification of Passed or Flagged. 
 ```{r reclassify}
 combined_df$LeadStatus[combined_df$LeadStatus!="Passed"]<-"Flagged"
 combined_df$LeadStatus=factor(combined_df$LeadStatus)
@@ -121,18 +121,18 @@ table(combined_df$LeadStatus)
 ```
 
 
-Split data into training, development, and test sets. What we mean by test set here is just Study E, where we have no response whatsoever.
+Split data into training, development, and test sets. What we mean by test set here is just Study E, where we have no response whatsoever. 
 ```{r split data}
 set.seed(1)
-tot=1:dim(combined_df)[1] # total number of observations
+tot=1:dim(combined_df)[1] # total number of observations 
 
-train=sample(tot,length(tot)*0.7) # put 70% of observations into training set
+train=sample(tot,length(tot)*0.7) # put 70% of observations into training set 
 combined.train=combined_df[train,]
 head(combined.train)
 
-dev=tot[-train] # rest go into development set
+dev=tot[-train] # rest go into development set 
 combined.dev=combined_df[dev,]
-test=E_df # study E is the test set
+test=E_df # study E is the test set 
 ```
 
 ## Naive Bayes
@@ -187,7 +187,7 @@ tpr.dev <- h2o.tpr(performance.dev) %>% .[['tpr']]
 data.frame(fpr = fpr.dev, tpr = tpr.dev) %>%
   ggplot(aes(fpr, tpr) ) +
   geom_line() +
-  ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) ) +
+  ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) ) + 
   theme_minimal()
 ggsave("Figures/naive_bayes_roc.png",width=6,height=4,units="in",device="png",dpi="retina")
 
@@ -210,13 +210,13 @@ write.csv(test.output,"test.nb.csv",row.names=FALSE)
 
 The naive classifier doesn't do great on our holdout test data. The total development AUC is $0.77$ but the false and true positive rates are high.
 
-## Logistic
-### Training - validation split
-We might try a logistic regression. However, Study E has no country of UK, so we take out the country as a predictor.
+## Logistic 
+### Training - validation split 
+We might try a logistic regression. However, Study E has no country of UK, so we take out the country as a predictor. 
 ```{r logistic}
 library(pROC)
 names(combined.train)
-combined.train.glm = combined.train[,-1] # exclude country from being a predictor
+combined.train.glm = combined.train[,-1] # exclude country from being a predictor 
 attach(combined.train.glm)
 names(combined.train.glm)
 train.glm = glm(LeadStatus~.,data = combined.train.glm,family = binomial)
@@ -230,7 +230,7 @@ glm.pred[glm.probs.flag.dev>0.2] = "Flagged"#change relevant values to "Flagged"
 table(glm.pred,combined.dev$LeadStatus)
 roc.dev = roc(LeadStatus~glm.probs.flag.dev,data = combined.dev)
 plot(roc.dev,xlim = c(0,1),ylim = c(0,1))
-
+savePlot("Figures/glm_roc.png",type="png",device=dev.cur())
 
 #kaggle test
 test = E_df
@@ -243,32 +243,14 @@ colnames(test.output.glm)[colnames(test.output.glm)=="AssessmentiD"] <- "Assessm
 write.csv(test.output.glm,"Predictions/test.glm.csv",row.names = FALSE)
 ggsave("Figures/glm_roc.png",width=6,height=4,units="in",device="png",dpi="retina")
 ```
-It looks like PANSS_Total, VisitDay, Study, TxGroup, and some countries are statistically significant predictors of Passed vs Flagged.
+It looks like PANSS_Total, VisitDay, Study, TxGroup, and some countries are statistically significant predictors of Passed vs Flagged. 
 
 ```{r similarity}
 plot(test.output.glm$LeadStatus,nb.predictions_df$Flagged,xlim = c(0,0.5),ylim = c(0,0.5))
 abline(0,1)
 ```
 
-```{r roc-logistic}
-library(ROCR)
-# AUC
-auc.dev = prediction(predict(train.glm,combined.dev,type = "response"), combined.dev$LeadStatus) %>%
-  performance(measure = "auc") %>%
-  .@y.values
-
-# Cross-entropy
-logloss.dev = prediction(predict(train.glm,combined.dev,type = "response"), ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
-  performance(measure = "mxe") %>%
-  .@y.values
-
-# ROC curves
-prediction(predict(train.glm,combined.dev,type = "response"), combined.dev$LeadStatus) %>%
-  performance(measure = "tpr", x.measure = "fpr") %>%
-  plot(main = sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
-```
-
-### Full training set
+### Full training set 
 ```{r full-logistic}
 full.glm = glm(LeadStatus~.,data = combined_df[,-1],family = binomial)
 summary(full.glm)
@@ -289,10 +271,7 @@ write.csv(test.full.glm,"Predictions/test.glm.full.csv",row.names = FALSE)
 plot(test.output.glm$LeadStatus,test.full.glm$LeadStatus)
 abline(0,1)
 ```
-
-
-
-### Logistic regression (all individual scores)
+### Logistic regression (all individual scores + lasso)
 ```{r include scores}
 # create dataframe that has all individual PANSS scores
 combined.all = rbind(A_init_df, B_init_df, C_init_df, D_init_df)
@@ -300,31 +279,31 @@ combined.all = subset(combined.all,select = setdiff(names(combined.all),c("Count
 names(combined.all)
 combined.all = distinct(combined.all)
 combined.all <- mutate_at(combined.all, vars(TxGroup,LeadStatus), as.factor)
-# str(combined.all) # compactly display structure of the object
+# str(combined.all) # compactly display structure of the object 
 
 
-# fix up LeadStatus column for the purposes of part 4
+# fix up LeadStatus column for the purposes of part 4 
 combined.all$LeadStatus[combined.all$LeadStatus!="Passed"]<-"Flagged"
 combined.all$LeadStatus = factor(combined.all$LeadStatus)
-table(combined.all$LeadStatus) # how many passed vs. not
+table(combined.all$LeadStatus) # how many passed vs. not 
 
 
 # split into training and dev set
 set.seed(1)
-tot = 1:dim(combined.all)[1] # total number of observations
+tot = 1:dim(combined.all)[1] # total number of observations 
 
-train = sample(tot,length(tot)*0.7) # put 70% of observations into training set
+train = sample(tot,length(tot)*0.7) # put 70% of observations into training set 
 combined.train.all = combined.all[train,]
-head(combined.train.all) # visually check data frame
+head(combined.train.all) # visually check data frame 
 
-dev = tot[-train] # rest go into development set
+dev = tot[-train] # rest go into development set 
 combined.dev.all = combined.all[dev,]
 
 
 # create test set that has all individual scores
 E_df_tmp = subset(E_init_df,select = setdiff(names(E_init_df),c("Country","Study","PatientID","RaterID","PANSS_Total","SiteID")))
 E_df_tmp = mutate_at(E_df_tmp,vars(TxGroup,AssessmentiD),as.factor)
-test.all = E_df_tmp # study E is the test set
+test.all = E_df_tmp # study E is the test set 
 ```
 
 ```{r logistic-all-predictors}
@@ -356,22 +335,11 @@ colnames(test.all.glm)[colnames(test.all.glm)=="test$AssessmentiD"] <- "Assessme
 write.csv(test.all.glm,"Predictions/test.all.glm.csv",row.names = FALSE)
 
 # compare to original logistic regression
-plot(test.output.glm$LeadStatus,test.all.glm$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5),xlab = "Logistic regression (only PANSS total)",ylab = "Logistic regression (all PANSS scores)")
+plot(test.output.glm$LeadStatus,test.all.glm$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
 abline(0,1)
-png(filename = "Figures/log-all-vs-log-few")
-```
-```{r roc-logistic-all}
-# AUC
-auc.dev = prediction(predict(train.all.glm,combined.dev.all,type = "response"), combined.dev.all$LeadStatus) %>% performance(measure = "auc") %>% .@y.values
-
-# Cross-entropy
-logloss.dev = prediction(predict(train.all.glm,combined.dev.all,type = "response"), ifelse(combined.dev.all$LeadStatus=="Passed", 1, 0)) %>% performance(measure = "mxe") %>% .@y.values
-
-# ROC curves
-prediction(predict(train.all.glm,combined.dev.all,type = "response"), combined.dev.all$LeadStatus) %>% performance(measure = "tpr", x.measure = "fpr") %>% plot(main = sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 ```
 
-### Logistic with (all individual scores + lasso)
+### Logistic with lasso
 ```{r log-lasso}
 library(glmnet)
 
@@ -411,42 +379,22 @@ plot(roc.dev,xlim = c(0,1),ylim = c(0,1))
 test.all$LeadStatus = test.full.glm$LeadStatus
 x_test2 <- model.matrix(LeadStatus~., test.all[,-which(names(test.all) == "AssessmentiD")])
 lasso_prob <- predict(cv.out, newx = x_test2, s=lambda_1se, type="response")
-
+<<<<<<< HEAD
 #write.csv(test.all.glm,"Predictions/test.lasso.glm.csv",row.names = FALSE)
-
+=======
 test.all$LeadStatus = lasso_prob
 test.lasso = subset(test.all, select = c(AssessmentiD,LeadStatus))
 write.csv(test.lasso,"Predictions/test.lasso.glm.csv",row.names = FALSE)
 
-
+>>>>>>> 8299705f28ff7875b0cce377600db7f2a00761a5
 # compare to original logistic regression
 plot(test.output.glm$LeadStatus,lasso_prob,xlim=c(0,0.5),ylim=c(0,0.5))
 abline(0,1)
-
-summary(cv.out$glmnet.fit)
-```
-```{r lasso-logistic}
-lasso_prob <- predict(cv.out, newx = x_test1, s=lambda_1se, type="response")
-
-# AUC
-auc.dev = prediction(lasso_prob, combined.dev.all$LeadStatus) %>%
-  performance(measure = "auc") %>%
-  .@y.values
-
-# Cross-entropy
-logloss.dev = prediction(lasso_prob, ifelse(combined.dev.all$LeadStatus=="Passed", 0, 1)) %>%
-  performance(measure = "mxe") %>%
-  .@y.values
-
-# ROC curves
-prediction(lasso_prob, ifelse(combined.dev.all$LeadStatus=="Passed", 0, 1)) %>%
-  performance(measure = "tpr", x.measure = "fpr") %>%
-  plot(main = sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 ```
 
 ## LDA
-### Training - validation split
-Study E has no country of UK, so we take out the country as a predictor.
+### Training - validation split 
+Study E has no country of UK, so we take out the country as a predictor. 
 ```{r lda-start}
 library(MASS)       # provides LDA & QDA model functions
 (lda.m1 = lda(LeadStatus~., data = combined.train[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")]))
@@ -466,20 +414,21 @@ mean(dev.lda.pred$class != combined.dev$LeadStatus)
 ```
 
 ```{r roc-curve}
+# ROC curves
+library(ROCR)
+prediction(dev.lda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot()
+
 # AUC
-auc.dev = prediction(dev.lda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+prediction(dev.lda.pred$posterior[,2], combined.dev$LeadStatus) %>%
   performance(measure = "auc") %>%
   .@y.values
 
-# Cross-entropy
-logloss.dev =prediction(dev.lda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
+# Cross-entropy 
+prediction(dev.lda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
   performance(measure = "mxe") %>%
   .@y.values
-
-# ROC curves
-prediction(dev.lda.pred$posterior[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "tpr", x.measure = "fpr") %>%
-  plot(main = sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 ```
 
 ```{r write-lda-result}
@@ -492,10 +441,10 @@ test = test[,c("AssessmentiD","LeadStatus")]
 plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
 abline(0,1)
 
-# write for kaggle prediction
+# write for kaggle prediction 
 write.csv(test,"Predictions/lda-prediction.csv",row.names=FALSE)
 ```
-### Use full training set
+### Use full training set  
 ```{r lda-full}
 (lda.full = lda(LeadStatus~., data = combined_df[,c("TxGroup","VisitDay","PANSS_Total","LeadStatus")]))
 plot(lda.full)
@@ -511,7 +460,7 @@ test = test[,c("AssessmentiD","LeadStatus")]
 plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
 abline(0,1)
 
-# write for kaggle prediction
+# write for kaggle prediction 
 write.csv(test,"Predictions/lda-full-prediction.csv",row.names=FALSE)
 ```
 
@@ -536,22 +485,22 @@ mean(dev.qda.pred$class == combined.dev$LeadStatus)
 # error rate
 mean(dev.qda.pred$class != combined.dev$LeadStatus)
 ```
-
 ```{r roc-curve-qda}
+# ROC curves
+library(ROCR)
+prediction(dev.qda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot()
+
 # AUC
-auc.dev=prediction(dev.qda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+prediction(dev.qda.pred$posterior[,2], combined.dev$LeadStatus) %>%
   performance(measure = "auc") %>%
   .@y.values
 
-# Cross-entropy
-logloss.dev=prediction(dev.qda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
+# Cross-entropy 
+prediction(dev.qda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
   performance(measure = "mxe") %>%
   .@y.values
-
-# ROC curves
-prediction(dev.qda.pred$posterior[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "tpr", x.measure = "fpr") %>%
-  plot(main = sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 ```
 
 ```{r write-qda-result}
@@ -564,7 +513,7 @@ test = test[,c("AssessmentiD","LeadStatus")]
 plot(test.output.glm$LeadStatus,test$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
 abline(0,1)
 
-# write for kaggle prediction
+# write for kaggle prediction 
 write.csv(test,"Predictions/qda-prediction.csv",row.names=FALSE)
 ```
 
@@ -857,13 +806,12 @@ tpr.dev <- h2o.tpr(pfm.gbm.dev) %>% .[['tpr']]
 data.frame(fpr = fpr.dev, tpr = tpr.dev) %>%
   ggplot(aes(fpr, tpr) ) +
   geom_line() +
-  ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) ) +
-  theme_minimal()
+  ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
+
 }
 
 #plot ROC curve
 getROC.h2o(h2o.gbm.fit1,combined.dev.h2o.gbm)
-ggsave("Figures/gbm_roc.png",device="png",dpi="retina")
 ```
 The development logloss from a default GBM model with 6-fold CV is 0.49 - not bad. The default model has 50 trees. We can train for more trees (say up to 1000):
 ```{r more trees gbm}
@@ -871,7 +819,6 @@ h2o.gbm.fit2 = h2o.gbm(x=X.train,y=Y.train,training_frame=combined.train.h2o.gbm
 
 h2o.gbm.fit2
 getROC.h2o(h2o.gbm.fit2,combined.dev.h2o.gbm)
-ggsave("Figures/gbm_more_trees_roc.png",device="png",dpi="retina")
 ```
 Now the logloss gets slightly better.
 
@@ -891,7 +838,7 @@ search_criteria=list(
   stopping_metric="logloss",
   stopping_tolerance=0.005,
   stopping_rounds=10,
-  max_runtime_secs=60*1 # report sets runtime to 30 min
+  max_runtime_secs=60*1
 )
 
 grid = h2o.grid(
@@ -914,7 +861,6 @@ best_model_id = grid_perf@model_ids[[1]]
 best_model.random.discrete = h2o.getModel(best_model_id)
 summary(grid_perf)
 getROC.h2o(best_model.random.discrete,combined.dev.h2o.gbm)
-ggsave("Figures/gbm_tuned_roc.png",device="png",dpi="retina")
 ```
 
 ```{r evaluate-gbm}
@@ -988,7 +934,7 @@ search_criteria = list(
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*1 # covers 36 models in 15 min. report sets runtime to 30 min.
+  max_runtime_secs = 60*1 # covers 36 models in 15 min
 )
 
 grid = h2o.grid(
@@ -1011,7 +957,6 @@ best_model_id = grid_perf@model_ids[[1]]
 best_model = h2o.getModel(best_model_id)
 summary(grid_perf)
 getROC.h2o(best_model,combined.dev.h2o.gbm)
-ggsave("Figures/gbm_all_pred_roc.png",device="png",dpi="retina")
 ```
 
 ```{r evaluate-gbm-all}
@@ -1036,16 +981,15 @@ h2o.final <- h2o.gbm(
 # model stopped after xx trees
 h2o.final@parameters$ntrees
 h2o.varimp_plot(h2o.final)
-ggsave("Figures/gbm_var_imp.png",device="png",dpi="retina")
 ```
 
 ```{r gbm-pred-all-predict}
-#getPredict(h2o.final,test.all,"Predictions/test.gbm.all.csv")
+getPredict(h2o.final,test.all,"Predictions/test.gbm.all.csv")
 ```
 
 
 
-## Random forests
+## Random forests 
 ```{r default-rf-model}
 #library(randomForest) # basic implementation
 library(ranger)       # a faster implementation of randomForest
@@ -1064,7 +1008,7 @@ m1
 ```
 
 ```{r rf-error}
-# prediction
+# prediction 
 pred_randomForest <- predict(m1, test.all)
 plot(test.output.glm$LeadStatus,pred_randomForest$predictions[,1],xlim=c(0,.5),ylim=c(0,.5))
 abline(0,1)
@@ -1090,15 +1034,15 @@ search_criteria <- list(
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*30 # did about 50 in 15 min
+  max_runtime_secs = 60*1 # did about 50 in 15 min
   )
 
 # build grid search
 random_grid <- h2o.grid(
   algorithm = "randomForest",
   grid_id = "rf_grid2",
-  x = X.train,
-  y = Y.train,
+  x = X.train, 
+  y = Y.train, 
   training_frame = combined.train.h2o.gbm,
   hyper_params = hyper_grid.h2o,
   search_criteria = search_criteria
@@ -1121,9 +1065,8 @@ best_model_id <- grid_perf2@model_ids[[1]]
 best_model <- h2o.getModel(best_model_id)
 
 # Now let’s evaluate the model performance on a test set
-h2o.varimp_plot(best_model)
+h2o.varimp_plot(best_model) 
 getROC.h2o(best_model,combined.dev.h2o.gbm)
-ggsave("Figures/rf_roc.png",device="png",dpi="retina")
 
 # train on full data set
 train.h2o <- as.h2o(combined.all)
@@ -1144,3 +1087,7 @@ h2o.final <- h2o.randomForest(
 # View prediction
 getPredict(h2o.final,test.all,"Predictions/test.rf.all.csv")
 ```
+
+
+
+
