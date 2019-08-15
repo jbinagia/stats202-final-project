@@ -93,7 +93,7 @@ Instead of looking at combined scores scores, we can look at individual positive
 combined_df_treated=combined_df[which(combined_df$TxGroup == "Treatment"),]
 combined_df_control=combined_df[which(combined_df$TxGroup == "Control"),]
 
-i =37# to prevent an overabundance of output in the html/pdf document 
+i =38# to prevent an overabundance of output in the html/pdf document 
 #for (i in 9:38) {
 p = ggplot(NULL,aes())+
   geom_point(data=combined_df_treated,aes(x=VisitDay,y=combined_df_treated[,i],col="Treatment"),size=0.5)+

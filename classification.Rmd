@@ -885,7 +885,7 @@ search_criteria=list(
   stopping_metric="logloss",
   stopping_tolerance=0.005,
   stopping_rounds=10,
-  max_runtime_secs=60*30
+  max_runtime_secs=60*1 # report sets runtime to 30 min 
 )
 
 grid = h2o.grid(
@@ -982,7 +982,7 @@ search_criteria = list(
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*30 # covers 36 models in 15 min
+  max_runtime_secs = 60*1 # covers 36 models in 15 min. report sets runtime to 30 min. 
 )
 
 grid = h2o.grid(
