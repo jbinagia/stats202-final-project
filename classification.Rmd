@@ -231,6 +231,7 @@ table(glm.pred,combined.dev$LeadStatus)
 roc.dev = roc(LeadStatus~glm.probs.flag.dev,data = combined.dev)
 plot(roc.dev,xlim = c(0,1),ylim = c(0,1))
 
+
 #kaggle test
 test = E_df
 glm.probs = predict(train.glm,test,type = "response")#compute predictions based on fit for each observation; 1 corresponds to Passed
@@ -247,6 +248,24 @@ It looks like PANSS_Total, VisitDay, Study, TxGroup, and some countries are stat
 ```{r similarity}
 plot(test.output.glm$LeadStatus,nb.predictions_df$Flagged,xlim = c(0,0.5),ylim = c(0,0.5))
 abline(0,1)
+```
+
+```{r roc-logistic}
+library(ROCR)
+# AUC
+auc.dev = prediction(predict(train.glm,combined.dev,type = "response"), combined.dev$LeadStatus) %>%
+  performance(measure = "auc") %>%
+  .@y.values
+
+# Cross-entropy 
+logloss.dev = prediction(predict(train.glm,combined.dev,type = "response"), ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
+  performance(measure = "mxe") %>%
+  .@y.values
+
+# ROC curves
+prediction(predict(train.glm,combined.dev,type = "response"), combined.dev$LeadStatus) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot(main = sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 ```
 
 ### Full training set 
@@ -270,7 +289,10 @@ write.csv(test.full.glm,"Predictions/test.glm.full.csv",row.names = FALSE)
 plot(test.output.glm$LeadStatus,test.full.glm$LeadStatus)
 abline(0,1)
 ```
-### Logistic regression (all individual scores + lasso)
+
+
+
+### Logistic regression (all individual scores)
 ```{r include scores}
 # create dataframe that has all individual PANSS scores
 combined.all = rbind(A_init_df, B_init_df, C_init_df, D_init_df)
@@ -334,11 +356,22 @@ colnames(test.all.glm)[colnames(test.all.glm)=="test$AssessmentiD"] <- "Assessme
 write.csv(test.all.glm,"Predictions/test.all.glm.csv",row.names = FALSE)
 
 # compare to original logistic regression
-plot(test.output.glm$LeadStatus,test.all.glm$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5))
+plot(test.output.glm$LeadStatus,test.all.glm$LeadStatus,xlim=c(0,0.5),ylim=c(0,0.5),xlab = "Logistic regression (only PANSS total)",ylab = "Logistic regression (all PANSS scores)")
 abline(0,1)
+png(filename = "Figures/log-all-vs-log-few")
+```
+```{r roc-logistic-all}
+# AUC
+auc.dev = prediction(predict(train.all.glm,combined.dev.all,type = "response"), combined.dev.all$LeadStatus) %>% performance(measure = "auc") %>% .@y.values
+
+# Cross-entropy 
+logloss.dev = prediction(predict(train.all.glm,combined.dev.all,type = "response"), ifelse(combined.dev.all$LeadStatus=="Passed", 1, 0)) %>% performance(measure = "mxe") %>% .@y.values
+
+# ROC curves
+prediction(predict(train.all.glm,combined.dev.all,type = "response"), combined.dev.all$LeadStatus) %>% performance(measure = "tpr", x.measure = "fpr") %>% plot(main = sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 ```
 
-### Logistic with lasso
+### Logistic with (all individual scores + lasso)
 ```{r log-lasso}
 library(glmnet)
 
@@ -386,6 +419,24 @@ write.csv(test.lasso,"Predictions/test.lasso.glm.csv",row.names = FALSE)
 plot(test.output.glm$LeadStatus,lasso_prob,xlim=c(0,0.5),ylim=c(0,0.5))
 abline(0,1)
 ```
+```{r lasso-logistic}
+lasso_prob <- predict(cv.out, newx = x_test1, s=lambda_1se, type="response")
+
+# AUC
+auc.dev = prediction(lasso_prob, combined.dev.all$LeadStatus) %>%
+  performance(measure = "auc") %>%
+  .@y.values
+
+# Cross-entropy 
+logloss.dev = prediction(lasso_prob, ifelse(combined.dev.all$LeadStatus=="Passed", 0, 1)) %>%
+  performance(measure = "mxe") %>%
+  .@y.values
+
+# ROC curves
+prediction(lasso_prob, ifelse(combined.dev.all$LeadStatus=="Passed", 0, 1)) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot(main = sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
+```
 
 ## LDA
 ### Training - validation split 
@@ -409,21 +460,20 @@ mean(dev.lda.pred$class != combined.dev$LeadStatus)
 ```
 
 ```{r roc-curve}
-# ROC curves
-library(ROCR)
-prediction(dev.lda.pred$posterior[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "tpr", x.measure = "fpr") %>%
-  plot()
-
 # AUC
-prediction(dev.lda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+auc.dev = prediction(dev.lda.pred$posterior[,2], combined.dev$LeadStatus) %>%
   performance(measure = "auc") %>%
   .@y.values
 
 # Cross-entropy 
-prediction(dev.lda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
+logloss.dev =prediction(dev.lda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
   performance(measure = "mxe") %>%
   .@y.values
+
+# ROC curves
+prediction(dev.lda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot(main = sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 ```
 
 ```{r write-lda-result}
@@ -480,22 +530,22 @@ mean(dev.qda.pred$class == combined.dev$LeadStatus)
 # error rate
 mean(dev.qda.pred$class != combined.dev$LeadStatus)
 ```
-```{r roc-curve-qda}
-# ROC curves
-library(ROCR)
-prediction(dev.qda.pred$posterior[,2], combined.dev$LeadStatus) %>%
-  performance(measure = "tpr", x.measure = "fpr") %>%
-  plot()
 
+```{r roc-curve-qda}
 # AUC
-prediction(dev.qda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+auc.dev=prediction(dev.qda.pred$posterior[,2], combined.dev$LeadStatus) %>%
   performance(measure = "auc") %>%
   .@y.values
 
 # Cross-entropy 
-prediction(dev.qda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
+logloss.dev=prediction(dev.qda.pred$posterior[,2], ifelse(combined.dev$LeadStatus=="Passed", 1, 0)) %>%
   performance(measure = "mxe") %>%
   .@y.values
+
+# ROC curves
+prediction(dev.qda.pred$posterior[,2], combined.dev$LeadStatus) %>%
+  performance(measure = "tpr", x.measure = "fpr") %>%
+  plot(main = sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
 ```
 
 ```{r write-qda-result}
@@ -801,12 +851,13 @@ tpr.dev <- h2o.tpr(pfm.gbm.dev) %>% .[['tpr']]
 data.frame(fpr = fpr.dev, tpr = tpr.dev) %>%
   ggplot(aes(fpr, tpr) ) +
   geom_line() +
-  ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) )
-
+  ggtitle( sprintf('Development Dataset AUC, LogLoss: %f, %f', auc.dev,logloss.dev) ) + 
+  theme_minimal()
 }
 
 #plot ROC curve
 getROC.h2o(h2o.gbm.fit1,combined.dev.h2o.gbm)
+ggsave("Figures/gbm_roc.png",device="png",dpi="retina")
 ```
 The development logloss from a default GBM model with 6-fold CV is 0.49 - not bad. The default model has 50 trees. We can train for more trees (say up to 1000):
 ```{r more trees gbm}
@@ -814,6 +865,7 @@ h2o.gbm.fit2 = h2o.gbm(x=X.train,y=Y.train,training_frame=combined.train.h2o.gbm
 
 h2o.gbm.fit2
 getROC.h2o(h2o.gbm.fit2,combined.dev.h2o.gbm)
+ggsave("Figures/gbm_more_trees_roc.png",device="png",dpi="retina")
 ```
 Now the logloss gets slightly better.
 
@@ -833,7 +885,7 @@ search_criteria=list(
   stopping_metric="logloss",
   stopping_tolerance=0.005,
   stopping_rounds=10,
-  max_runtime_secs=60*1
+  max_runtime_secs=60*30
 )
 
 grid = h2o.grid(
@@ -856,6 +908,7 @@ best_model_id = grid_perf@model_ids[[1]]
 best_model.random.discrete = h2o.getModel(best_model_id)
 summary(grid_perf)
 getROC.h2o(best_model.random.discrete,combined.dev.h2o.gbm)
+ggsave("Figures/gbm_tuned_roc.png",device="png",dpi="retina")
 ```
 
 ```{r evaluate-gbm}
@@ -929,7 +982,7 @@ search_criteria = list(
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*1 # covers 36 models in 15 min
+  max_runtime_secs = 60*30 # covers 36 models in 15 min
 )
 
 grid = h2o.grid(
@@ -952,6 +1005,7 @@ best_model_id = grid_perf@model_ids[[1]]
 best_model = h2o.getModel(best_model_id)
 summary(grid_perf)
 getROC.h2o(best_model,combined.dev.h2o.gbm)
+ggsave("Figures/gbm_all_pred_roc.png",device="png",dpi="retina")
 ```
 
 ```{r evaluate-gbm-all}
@@ -976,10 +1030,11 @@ h2o.final <- h2o.gbm(
 # model stopped after xx trees
 h2o.final@parameters$ntrees
 h2o.varimp_plot(h2o.final)
+ggsave("Figures/gbm_var_imp.png",device="png",dpi="retina")
 ```
 
 ```{r gbm-pred-all-predict}
-getPredict(h2o.final,test.all,"Predictions/test.gbm.all.csv")
+#getPredict(h2o.final,test.all,"Predictions/test.gbm.all.csv")
 ```
 
 
@@ -1029,7 +1084,7 @@ search_criteria <- list(
   stopping_metric = "logloss",
   stopping_tolerance = 0.005,
   stopping_rounds = 10,
-  max_runtime_secs = 60*1 # did about 50 in 15 min
+  max_runtime_secs = 60*30 # did about 50 in 15 min
   )
 
 # build grid search
@@ -1062,6 +1117,7 @@ best_model <- h2o.getModel(best_model_id)
 # Now let’s evaluate the model performance on a test set
 h2o.varimp_plot(best_model) 
 getROC.h2o(best_model,combined.dev.h2o.gbm)
+ggsave("Figures/rf_roc.png",device="png",dpi="retina")
 
 # train on full data set
 train.h2o <- as.h2o(combined.all)
