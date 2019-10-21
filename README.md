@@ -1,7 +1,4 @@
-# stats202-final-project
+# Analyzing and Predicting Treatment Effects for Schizophrenia Patients (STATS 202 Final Project)
+Authors: Jeremy Binagia & Sai Gourisankur 
 
-## Notes from Google Group
-- Format of write-up: https://groups.google.com/forum/#!topic/stats202/krv72oeLeGw
-- Notes on project: https://groups.google.com/forum/#!topic/stats202/ULXRN3seaBEs
-  - should either use one study as a validation set or combine data and randomly set aside subset for validation
-- Interpretation of "18th week": https://groups.google.com/forum/#!searchin/stats202/visit$20day%7Csort:date/stats202/-73T4NgRiro/hSH8q9NbDgAJ
+In this repository contains the code used to complete the final project for Stanford STATS 202 in Summer 2019. We refer those interested to the [project prompt](Prompt & Writeup/final_project_prompt.pdf) as well as the [final project writeup](Prompt & Writeup/STATS_202_Final_Report.pdf) for details of the project and of our analysis respectively. 
